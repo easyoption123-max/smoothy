@@ -1,0 +1,153 @@
+/* Smoothy App custom dashboard styles */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+.pulsing-dot {
+  animation: pulse-ring 2s infinite;
+}
+
+/* Custom scrollbar styling for terminal logs */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(17, 24, 39, 0.3);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.5);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.7);
+}
+
+/* --- Added Neon & Sound Wave Polish Styles --- */
+
+/* Neon border flashing animation */
+@keyframes neon-pulse-green {
+  0% {
+    border-color: rgba(16, 185, 129, 0.2);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.1);
+  }
+  50% {
+    border-color: rgba(16, 185, 129, 0.8);
+    box-shadow: 0 0 14px 2px rgba(16, 185, 129, 0.35);
+  }
+  100% {
+    border-color: rgba(16, 185, 129, 0.2);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.1);
+  }
+}
+
+.neon-glow-green {
+  animation: neon-pulse-green 1.5s infinite;
+}
+
+@keyframes neon-pulse-mint {
+  0% {
+    border-color: rgba(16, 185, 129, 0.2);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.1);
+  }
+  50% {
+    border-color: rgba(52, 211, 153, 0.85);
+    box-shadow: 0 0 14px 2px rgba(52, 211, 153, 0.45);
+  }
+  100% {
+    border-color: rgba(16, 185, 129, 0.2);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.1);
+  }
+}
+
+.neon-glow-mint {
+  animation: neon-pulse-mint 1.8s infinite;
+}
+
+@keyframes neon-pulse-cream {
+  0% {
+    border-color: rgba(253, 251, 247, 0.15);
+    box-shadow: 0 0 0 0 rgba(253, 251, 247, 0.05);
+  }
+  50% {
+    border-color: rgba(253, 251, 247, 0.7);
+    box-shadow: 0 0 12px 2px rgba(253, 251, 247, 0.25);
+  }
+  100% {
+    border-color: rgba(253, 251, 247, 0.15);
+    box-shadow: 0 0 0 0 rgba(253, 251, 247, 0.05);
+  }
+}
+
+.neon-glow-cream {
+  animation: neon-pulse-cream 2s infinite;
+}
+
+/* Flashing neon text */
+@keyframes neon-text-flash {
+  0%, 100% {
+    text-shadow: 0 0 2px rgba(52, 211, 153, 0.2);
+    opacity: 0.85;
+  }
+  50% {
+    text-shadow: 0 0 8px rgba(52, 211, 153, 0.85), 0 0 16px rgba(52, 211, 153, 0.4);
+    opacity: 1;
+  }
+}
+
+.neon-text-emerald {
+  animation: neon-text-flash 1s infinite;
+}
+
+/* Sound/Mute Toggle Indicator animation */
+@keyframes wave-pulse {
+  0%, 100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.sound-wave-bar {
+  display: inline-block;
+  width: 2px;
+  height: 10px;
+  background-color: #34d399;
+  margin: 0 1px;
+  transform-origin: bottom;
+}
+
+.sound-wave-bar:nth-child(1) { animation: wave-pulse 0.6s infinite ease-in-out; }
+.sound-wave-bar:nth-child(2) { animation: wave-pulse 0.4s infinite ease-in-out 0.1s; }
+.sound-wave-bar:nth-child(3) { animation: wave-pulse 0.8s infinite ease-in-out 0.2s; }
+
+/* Neon gold flashing text */
+@keyframes neon-text-flash-gold {
+  0%, 100% {
+    text-shadow: 0 0 2px rgba(245, 158, 11, 0.2);
+    opacity: 0.85;
+  }
+  50% {
+    text-shadow: 0 0 8px rgba(245, 158, 11, 0.85), 0 0 16px rgba(245, 158, 11, 0.4);
+    opacity: 1;
+  }
+}
+
+.neon-text-gold {
+  animation: neon-text-flash-gold 1.5s infinite;
+}

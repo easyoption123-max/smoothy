@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    background-color: #0b0f19;
+    color: #f3f4f6;
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  }
+}
+
+/* Custom wallet adapter button styling to match our dark mode terminal theme */
+.wallet-adapter-button {
+  background-color: #3b82f6 !important;
+  font-family: inherit !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  height: 42px !important;
+  padding: 0 16px !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+.wallet-adapter-button:not([disabled]):hover {
+  background-color: #2563eb !important;
+  transform: translateY(-1px);
+}
+
+.wallet-adapter-button-trigger {
+  background-color: #6366f1 !important;
+}
+
+.wallet-adapter-button-trigger:not([disabled]):hover {
+  background-color: #4f46e5 !important;
+}
