@@ -33,7 +33,6 @@ interface LogEntry {
 }
 
 // Jupiter API & Routing Constants (Live High-Frequency API)
-const JUP_API_KEY = "15fecbfd-f16a-4d69-b4d6-0130de797456";
 const QUOTE_URL = "https://api.jup.ag/swap/v1/quote";
 const ULTRA_BASE = "https://api.jup.ag/swap/v2";
 const ORDER_URL = `${ULTRA_BASE}/order`;
@@ -374,12 +373,8 @@ export default function App() {
       const lamports = Math.round(amt * LAMPORTS_PER_SOL);
       
       try {
-        // Query official QUOTE_URL with JUP_API_KEY
-        const response = await fetch(`${QUOTE_URL}?inputMint=${inputMint}&outputMint=${outputMint}&amount=${lamports}`, {
-          headers: {
-            'x-api-key': JUP_API_KEY
-          }
-        });
+        // Query official QUOTE_URL
+        const response = await fetch(`${QUOTE_URL}?inputMint=${inputMint}&outputMint=${outputMint}&amount=${lamports}`);
         if (response.ok) {
           liveQuoteData = await response.json();
         }
@@ -397,11 +392,11 @@ export default function App() {
       `🚀 [6/6] Simulating swap sequence via local simulation engine...`
     ] : [
       `⚙️ [1/6] CONNECTING TO LIVE SOLANA MAINNET WRITE RPC FEED: https://api.mainnet-beta.solana.com`,
-      `🔍 [2/6] Querying official Quote Endpoint: ${QUOTE_URL} (API Key loaded)`,
+      `🔍 [2/6] Querying official Quote Endpoint: ${QUOTE_URL}`,
       liveQuoteData 
         ? `📊 [3/6] LIVE JUPITER QUOTE ACQUIRED: OutAmount = ${(parseInt(liveQuoteData.outAmount) / (token === 'USDC' ? 1e6 : token === 'BONK' ? 1e5 : 1e9)).toFixed(4)} ${token}, Price Impact = ${liveQuoteData.priceImpactPct || '0.01'}%`
         : `📊 [3/6] LIVE JUPITER QUOTE MOCKED (CORS): OutAmount = ${(amt * (res.buySpotPrice || 140)).toFixed(4)} ${token}, Price Impact = 0.02%`,
-      `⚡ [4/6] Real-time slippage & frontrun risk evaluation completed. JUP_API_KEY verified.`,
+      `⚡ [4/6] Real-time slippage & frontrun risk evaluation completed.`,
       `📦 [5/6] Routing transaction parameters to Ultra-Base Endpoint: ${ORDER_URL}`,
       `🚀 [6/6] Submitting execution transaction instructions packet directly to Solana cluster: ${SWAP_URL}`
     ];

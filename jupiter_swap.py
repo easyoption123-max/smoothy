@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
 Smoothy - Live Solana Mainnet Jupiter Swap Automation Script
-Implements the full Jupiter Routing Pipeline using your premium endpoints in Python:
+Implements the full Jupiter Routing Pipeline using standard endpoints in Python:
 - RPC_URL: https://api.mainnet-beta.solana.com
 - QUOTE_URL: https://api.jup.ag/swap/v1/quote
 - SWAP_URL: https://api.jup.ag/swap/v2/swap (or official v6 swap generation)
-- JUP_API_KEY: 15fecbfd-f16a-4d69-b4d6-0130de797456
 """
 
 import os
@@ -18,7 +17,7 @@ import requests
 RPC_URL = "https://api.mainnet-beta.solana.com"
 QUOTE_URL = "https://api.jup.ag/swap/v1/quote"
 SWAP_URL = "https://api.jup.ag/swap/v6/swap"  # Jupiter's official high-performance transaction builder endpoint
-JUP_API_KEY = "15fecbfd-f16a-4d69-b4d6-0130de797456"
+JUP_API_KEY = ""
 
 # 2. Token Mint Configurations (Solana Mainnet)
 MINTS = {
@@ -29,11 +28,13 @@ MINTS = {
 }
 
 def get_headers():
-    """Returns headers with Jup API Key authorization."""
-    return {
-        "x-api-key": JUP_API_KEY.strip(),
+    """Returns standard application/json headers."""
+    headers = {
         "Content-Type": "application/json"
     }
+    if JUP_API_KEY.strip():
+        headers["x-api-key"] = JUP_API_KEY.strip()
+    return headers
 
 def fetch_quote(input_token: str, output_token: str, amount_lamports: int):
     """
@@ -136,7 +137,7 @@ def main():
             print("   2. Sign with your private key using `solders` or `solana` SDK.")
             print("   3. Post to the RPC node using `sendTransaction` / `send_raw_transaction`.")
             print("=" * 65)
-            print("   Status: Operational | Authenticated")
+            print("   Status: Operational")
         else:
             print("\n❌ Failed to build swap transaction.")
     else:
