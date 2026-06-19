@@ -41,7 +41,7 @@ const JUP_API_KEY = "15fecbfd-f16a-4d69-b4d6-0130de797456";
 const QUOTE_URL = "https://api.jup.ag/swap/v1/quote";
 const ULTRA_BASE = "https://api.jup.ag/swap/v2";
 const ORDER_URL = `${ULTRA_BASE}/order`;
-const EXECUTE_URL = `${ULTRA_BASE}/execute`;
+const SWAP_URL = `${ULTRA_BASE}/swap`;
 
 // Real Solana Token Mint Mappings for High-Fidelity Quote Lookup
 const MINT_MAPPINGS: Record<string, string> = {
@@ -479,7 +479,7 @@ function ArbitrageDashboard() {
         : `📊 [3/6] LIVE JUPITER QUOTE MOCKED (CORS): OutAmount = ${(amt * (res.buySpotPrice || 140)).toFixed(4)} ${token}, Price Impact = 0.02%`,
       `⚡ [4/6] Real-time slippage & frontrun risk evaluation completed. JUP_API_KEY verified.`,
       `📦 [5/6] Routing transaction parameters to Ultra-Base Endpoint: ${ORDER_URL}`,
-      `🚀 [6/6] Submitting execution transaction instructions packet directly to Jito Relayer: ${EXECUTE_URL}`
+      `🚀 [6/6] Submitting execution transaction instructions packet directly to Jito Relayer: ${SWAP_URL}`
     ];
 
     let currentStep = 0;
