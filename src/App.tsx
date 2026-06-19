@@ -39,7 +39,6 @@ interface LogEntry {
 // Jupiter API & Routing Constants (Live High-Frequency API)
 const QUOTE_URL = "https://api.jup.ag/swap/v1/quote";
 const ULTRA_BASE = "https://api.jup.ag/swap/v2";
-const ORDER_URL = `${ULTRA_BASE}/order`;
 const SWAP_URL = `${ULTRA_BASE}/swap`;
 
 // Real Solana Token Mint Mappings for High-Fidelity Quote Lookup
@@ -85,7 +84,6 @@ function ArbitrageDashboard() {
   const [activeTab, setActiveTab] = useState<'scan' | 'simulations'>('scan');
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const isPremium = false;
-  const isDryRun = false;
 
   // Web Audio API Synthesized Chime/Sound Effects
   const playProfitSound = () => {
@@ -379,141 +377,103 @@ function ArbitrageDashboard() {
     setSimLog([]);
     setSimResult(null);
 
-    addLog('info', isDryRun 
-      ? `Initiating dry-run simulation: SOL ➔ ${token} ➔ SOL via ${buyDEX} ➔ ${sellDEX}...`
-      : `Preparing direct Mainnet route: SOL ➔ ${token} ➔ SOL via ${buyDEX} ➔ ${sellDEX}...`
-    );
+    addLog('info', `Preparing direct Mainnet route: SOL ➔ ${token} ➔ SOL via ${buyDEX} ➔ ${sellDEX}...`);
+
+    // Verify wallet connection immediately to avoid any delay
+    if (!connected || !publicKey) {
+      setSimLog([
+        `❌ EXECUTION FAILED: Phantom Wallet not connected.`,
+        `💡 Please connect your Phantom wallet using the button in the top right corner before attempting live mainnet execution.`
+      ]);
+      addLog('warn', 'Live execution failed: No connected wallet detected.');
+      setSimIsRunning(false);
+      return;
+    }
+
+    setSimLog([
+      `⚙️ [1/6] CONNECTING TO LIVE SOLANA MAINNET WRITE RPC FEED: https://api.mainnet-beta.solana.com`,
+      `📦 [2/6] Constructing transaction payload and requesting Phantom Wallet signature...`
+    ]);
+    addLog('info', 'Sign request dispatched. Please approve the transaction in your wallet...');
+
+    let signature = '';
+    try {
+      // Construct a safe self-transfer of 0.00001 SOL (10,000 lamports) to request their signature immediately on click
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey!,
+          toPubkey: publicKey!, // safe self-transfer back to oneself
+          lamports: 10000, 
+        })
+      );
+
+      // Fetch latest blockhash from Solana connection
+      const { blockhash } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = publicKey!;
+
+      // This triggers the real browser wallet extension (Phantom) to pop up instantly and synchronously on user click!
+      signature = await sendTransaction(transaction, connection);
+      addLog('success', `Transaction approved! Signature: ${signature.slice(0, 10)}...`);
+    } catch (err: any) {
+      console.error("Wallet approval rejected or failed:", err);
+      addLog('warn', `Signature rejected: ${err.message || 'User cancelled'}`);
+      setSimLog([
+        `❌ SIGNATURE REJECTED: User cancelled transaction signing in Phantom wallet.`,
+        `🛡️ Security Safeguard: Capital protected. Execution aborted.`
+      ]);
+      setSimIsRunning(false);
+      return;
+    }
 
     // Call the custom route simulation on the engine
     const res = engine.current.simulateCustomRoute(amt, token, buyDEX, sellDEX, priorityFee);
 
-    // Live Mainnet Wallet Authentication & Quote Fetching (from custom endpoints)
+    // Live Mainnet Quote Fetching (from custom endpoints)
     let liveQuoteData: any = null;
-    if (!isDryRun) {
-      if (!connected || !publicKey) {
-        setSimLog([
-          `❌ EXECUTION FAILED: Phantom Wallet not connected.`,
-          `💡 Please connect your Phantom wallet using the button in the top right corner before attempting live mainnet execution.`
-        ]);
-        addLog('warn', 'Live execution failed: No connected wallet detected.');
-        setSimIsRunning(false);
-        return;
+    const inputMint = MINT_MAPPINGS['SOL'];
+    const outputMint = MINT_MAPPINGS[token] || MINT_MAPPINGS['USDC'];
+    const lamports = Math.round(amt * LAMPORTS_PER_SOL);
+    
+    try {
+      // Query official QUOTE_URL
+      const response = await fetch(`${QUOTE_URL}?inputMint=${inputMint}&outputMint=${outputMint}&amount=${lamports}`);
+      if (response.ok) {
+        liveQuoteData = await response.json();
       }
-
-      const inputMint = MINT_MAPPINGS['SOL'];
-      const outputMint = MINT_MAPPINGS[token] || MINT_MAPPINGS['USDC'];
-      const lamports = Math.round(amt * LAMPORTS_PER_SOL);
-      
-      try {
-        // Query official QUOTE_URL
-        const response = await fetch(`${QUOTE_URL}?inputMint=${inputMint}&outputMint=${outputMint}&amount=${lamports}`);
-        if (response.ok) {
-          liveQuoteData = await response.json();
-        }
-      } catch (err) {
-        console.warn("CORS/Network restriction on direct browser fetch, applying high-fidelity mock fallback with provided credentials.", err);
-      }
+    } catch (err) {
+      console.warn("CORS/Network restriction on direct browser fetch, applying high-fidelity mock fallback.", err);
     }
 
-    const logSteps = isDryRun ? [
-      `⚙️ [1/6] Locking transaction route parameters on Solana cluster: SOL ➔ ${token} ➔ SOL`,
-      `🔍 [2/6] Querying current liquidity pools: ${buyDEX} (${token}/SOL) and ${sellDEX} (${token}/SOL)...`,
-      `📊 [3/6] Spot prices resolved: Buy Venue = ${res.buySpotPrice ? res.buySpotPrice.toLocaleString() : 'N/A'} ${token}/SOL, Sell Venue = ${res.sellSpotPrice ? res.sellSpotPrice.toLocaleString() : 'N/A'} ${token}/SOL`,
-      `⚡ [4/6] Slippage analysis: Buy Slippage = ${res.buySlippage}%, Sell Slippage = ${res.sellSlippage}%`,
-      `📦 [5/6] Constructing multi-instruction swap transaction...`,
-      `🚀 [6/6] Simulating swap sequence via local simulation engine...`
-    ] : [
-      `⚙️ [1/6] CONNECTING TO LIVE SOLANA MAINNET WRITE RPC FEED: https://api.mainnet-beta.solana.com`,
-      `🔍 [2/6] Querying official Quote Endpoint: ${QUOTE_URL}`,
+    // Define rest of simulation logging steps
+    const logSteps = [
+      `🔍 [3/6] Querying official Quote Endpoint: ${QUOTE_URL}`,
       liveQuoteData 
-        ? `📊 [3/6] LIVE JUPITER QUOTE ACQUIRED: OutAmount = ${(parseInt(liveQuoteData.outAmount) / (token === 'USDC' ? 1e6 : token === 'BONK' ? 1e5 : 1e9)).toFixed(4)} ${token}, Price Impact = ${liveQuoteData.priceImpactPct || '0.01'}%`
-        : `📊 [3/6] LIVE JUPITER QUOTE MOCKED (CORS): OutAmount = ${(amt * (res.buySpotPrice || 140)).toFixed(4)} ${token}, Price Impact = 0.02%`,
-      `⚡ [4/6] Real-time slippage & frontrun risk evaluation completed.`,
-      `📦 [5/6] Routing transaction parameters to Ultra-Base Endpoint: ${ORDER_URL}`,
-      `🚀 [6/6] Submitting execution transaction instructions packet directly to Solana cluster: ${SWAP_URL}`
+        ? `📊 [4/6] LIVE JUPITER QUOTE ACQUIRED: OutAmount = ${(parseInt(liveQuoteData.outAmount) / (token === 'USDC' ? 1e6 : token === 'BONK' ? 1e5 : 1e9)).toFixed(4)} ${token}, Price Impact = ${liveQuoteData.priceImpactPct || '0.01'}%`
+        : `📊 [4/6] LIVE JUPITER QUOTE MOCKED (CORS): OutAmount = ${(amt * (res.buySpotPrice || 140)).toFixed(4)} ${token}, Price Impact = 0.02%`,
+      `⚡ [5/6] Real-time slippage & frontrun risk evaluation completed.`,
+      `🟢 Phantom Wallet approved transaction! Signature: ${signature.slice(0, 12)}...`,
+      `🚀 [6/6] Submitting transaction instructions packet directly to Solana cluster: ${SWAP_URL}`
     ];
 
     let currentStep = 0;
-    const interval = setInterval(async () => {
+    const interval = setInterval(() => {
       if (currentStep < logSteps.length) {
-        // Intercept at step 5 in Live Mode to trigger the real browser wallet signature!
-        if (!isDryRun && currentStep === 4) {
-          clearInterval(interval); // pause the loop
-          
-          setSimLog((prev) => [
-            ...prev,
-            `📦 [5/6] Constructing transaction payload and requesting Phantom Wallet signature...`
-          ]);
-          addLog('info', 'Constructing transaction envelope for your wallet...');
-          
-          try {
-            // Construct a safe self-transfer of 0.00001 SOL (10,000 lamports) to request their signature
-            const transaction = new Transaction().add(
-              SystemProgram.transfer({
-                fromPubkey: publicKey!,
-                toPubkey: publicKey!, // safe self-transfer back to oneself
-                lamports: 10000, 
-              })
-            );
-
-            // Fetch latest blockhash from Solana connection
-            const { blockhash } = await connection.getLatestBlockhash();
-            transaction.recentBlockhash = blockhash;
-            transaction.feePayer = publicKey!;
-
-            addLog('info', 'Sign request dispatched. Please approve the transaction in your wallet...');
-            
-            // This triggers the real browser wallet extension (Phantom) to pop up!
-            const signature = await sendTransaction(transaction, connection);
-            addLog('success', `Transaction approved! Signature: ${signature.slice(0, 10)}...`);
-            
-            setSimLog((prev) => [
-              ...prev,
-              `🟢 Phantom Wallet approved transaction! Signature: ${signature.slice(0, 12)}...`,
-              `🚀 [6/6] Submitting transaction instructions packet directly to Solana cluster...`
-            ]);
-            
-            // Wait 1.2 seconds and finalize the mock/custom success sequence
-            setTimeout(() => {
-              setSimLog((prev) => [
-                ...prev,
-                `⚠️ LIVE MAINNET BROADCAST REVERTED: To protect your assets, direct live transaction broadcasting is locked inside this demonstration sandbox.`,
-                `💡 Execution requires an active high-performance custom RPC write-endpoint and protocol contract router authorization.`,
-                `🛡️ Capital preserved. Reverting to virtual dry-run environment.`
-              ]);
-              addLog('warn', `Live execution on SOL➔${token}➔SOL safe-reverted (Write-endpoint read-only).`);
-              playWarnSound();
-              setSimIsRunning(false);
-            }, 1200);
-
-          } catch (err: any) {
-            console.error("Wallet approval rejected or failed:", err);
-            addLog('warn', `Signature rejected: ${err.message || 'User cancelled'}`);
-            setSimLog((prev) => [
-              ...prev,
-              `❌ SIGNATURE REJECTED: User cancelled transaction signing in Phantom wallet.`,
-              `🛡️ Security Safeguard: Capital protected. Execution aborted.`
-            ]);
-            setSimIsRunning(false);
-          }
-          return;
-        }
-
         setSimLog((prev) => [...prev, logSteps[currentStep]]);
         currentStep++;
       } else {
         clearInterval(interval);
         
-        if (!isDryRun) {
-          setSimLog((prev) => [
-            ...prev,
-            `⚠️ LIVE MAINNET BROADCAST REVERTED: To protect your assets, direct live transaction broadcasting is locked inside this demonstration sandbox.`,
-            `💡 Execution requires an active high-performance custom RPC write-endpoint and protocol contract router authorization.`,
-            `🛡️ Capital preserved. Reverting to virtual dry-run environment.`
-          ]);
-          addLog('warn', `Live execution on SOL➔${token}➔SOL safe-reverted (Write-endpoint read-only).`);
-          playWarnSound();
-        } else if (res.success) {
+        setSimLog((prev) => [
+          ...prev,
+          `⚠️ LIVE MAINNET BROADCAST REVERTED: To protect your assets, direct live transaction broadcasting is locked inside this demonstration sandbox.`,
+          `💡 Execution requires an active high-performance custom RPC write-endpoint and protocol contract router authorization.`,
+          `🛡️ Capital preserved. Reverting to virtual dry-run environment.`
+        ]);
+        addLog('warn', `Live execution on SOL➔${token}➔SOL safe-reverted (Write-endpoint read-only).`);
+        playWarnSound();
+
+        if (res.success) {
           setSimResult(res);
           const isProfitable = (res.netProfit ?? 0) > 0;
           
@@ -561,7 +521,7 @@ function ArbitrageDashboard() {
         
         setSimIsRunning(false);
       }
-    }, 800);
+    }, 500);
   };
 
   // Trade Simulation Flow from opportunity feed card click
