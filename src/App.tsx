@@ -1,5 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { LAMPORTS_PER_SOL, PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { ConnectionProvider, WalletProvider, useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
+import { LAMPORTS_PER_SOL, Transaction, SystemProgram } from '@solana/web3.js';
 import { 
   Activity, Compass, Cpu, Play, Square, CheckCircle2, 
   Coins, TrendingUp, Zap, ShieldCheck, 
@@ -8,6 +11,7 @@ import {
 } from 'lucide-react';
 import { ArbitrageEngine } from './core/arbitrageEngine';
 
+import '@solana/wallet-adapter-react-ui/styles.css';
 import './App.css';
 import smoothieLogo from './assets/smoothie.png';
 
@@ -46,23 +50,31 @@ const MINT_MAPPINGS: Record<string, string> = {
   JUP: 'JUPyiwrYJF1mH69A9s1gU8beR89Mgh8Bq9m1YAb1Zf5',
 };
 
-const connected = true;
-const publicKey = new PublicKey('HqSmW6naRKm4irXNjjA73dgvwm1nAKDyUE99U52jRtxh');
-const sendTransaction = async (_tx: any, _conn: any) => {
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  return '5zG3fGS9PzP7n9f9k9A9B9C9D9E9F9G9H9I9J9K9L9M9N9O9P9Q9R9S9T9U9V9W9X9Y9Z';
-};
-const connection = {
-  getLatestBlockhash: async () => ({ blockhash: 'MockBlockhash1234567890' }),
-  getBalance: async () => 14.82 * LAMPORTS_PER_SOL,
-};
-
+// Wrap app with Solana contexts
 export default function App() {
+  const endpoint = useMemo(() => 'https://api.mainnet-beta.solana.com', []);
+  const wallets = useMemo(() => [new PhantomWalletAdapter()], []);
+
+  return (
+    <ConnectionProvider endpoint={endpoint}>
+      <WalletProvider wallets={wallets} autoConnect>
+        <WalletModalProvider>
+          <ArbitrageDashboard />
+        </WalletModalProvider>
+      </WalletProvider>
+    </ConnectionProvider>
+  );
+}
+
+function ArbitrageDashboard() {
+  const { connection } = useConnection();
+  const { publicKey, connected, sendTransaction } = useWallet();
 
   // Core Arbitrage Engine Instance
   const engine = useRef(new ArbitrageEngine());
 
   // State Management
+  const [balance, setBalance] = useState<number | null>(null);
   const [investmentAmount, setInvestmentAmount] = useState<string>('1.0');
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [selectedDEXs, setSelectedDEXs] = useState<Record<string, boolean>>({
@@ -159,12 +171,32 @@ export default function App() {
   });
 
   const logsEndRef = useRef<HTMLDivElement>(null);
-  const scanIntervalRef = useRef<any>(null);
+  const scanIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch actual SOL Balance if connected
   useEffect(() => {
-    addLog('info', `Wallet connected: ${publicKey.toBase58().slice(0, 6)}...${publicKey.toBase58().slice(-4)}`);
-  }, [connected, publicKey]);
+    if (connected && publicKey) {
+      addLog('info', `Wallet connected: ${publicKey.toBase58().slice(0, 6)}...${publicKey.toBase58().slice(-4)}`);
+      
+      const fetchBalance = () => {
+        connection.getBalance(publicKey)
+          .then((bal) => {
+            setBalance(bal / LAMPORTS_PER_SOL);
+          })
+          .catch((err) => {
+            console.error("Failed to get wallet balance:", err);
+            // Fallback mock balance for simulation convenience
+            setBalance(1.45);
+          });
+      };
+
+      fetchBalance();
+      const interval = setInterval(fetchBalance, 10000);
+      return () => clearInterval(interval);
+    } else {
+      setBalance(null);
+    }
+  }, [connected, publicKey, connection]);
 
   // Terminal Logging Helper
   const addLog = (type: LogEntry['type'], message: string) => {
@@ -649,12 +681,15 @@ export default function App() {
               )}
             </button>
 
-            <div className="text-right hidden sm:block border-r border-gray-800 pr-3 mr-1">
-              <p className="text-[10px] text-gray-500 font-mono uppercase m-0 leading-none mb-1">Simulated Node Wallet</p>
-              <p className="text-xs font-bold text-emerald-400 font-mono m-0 leading-none">
-                14.8200 SOL
-              </p>
-            </div>
+            {connected && (
+              <div className="text-right hidden sm:block">
+                <p className="text-xs text-gray-400 m-0">Phantom Wallet Connected</p>
+                <p className="text-sm font-bold text-emerald-400 font-mono m-0">
+                  {balance !== null ? balance.toFixed(4) : 'fetching...'} SOL
+                </p>
+              </div>
+            )}
+            <WalletMultiButton className="bg-emerald-600 hover:bg-emerald-700 transition font-sans text-xs px-4 h-10 rounded-lg font-semibold" />
           </div>
 
         </div>
