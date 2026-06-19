@@ -1192,12 +1192,16 @@ function ArbitrageDashboard() {
                                 disabled={simIsRunning}
                                 className={`w-full py-2 px-4 rounded-lg font-bold text-xs transition border flex items-center justify-center gap-1 ${
                                   isProfitable
-                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent shadow'
+                                    ? isDryRun
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent shadow shadow-emerald-500/5'
+                                      : 'bg-blue-600 hover:bg-blue-700 text-white border-transparent shadow shadow-blue-500/5'
                                     : 'bg-transparent hover:bg-gray-800 text-gray-400 border-gray-800'
                                 }`}
                               >
                                 <Zap className="h-3.5 w-3.5" />
-                                {isProfitable ? 'Swap' : 'Ignore Route'}
+                                {isProfitable 
+                                  ? isDryRun ? 'Simulate Swap' : 'Blueberry Swap'
+                                  : 'Ignore Route'}
                               </button>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 font-mono py-1">
@@ -1376,18 +1380,20 @@ function ArbitrageDashboard() {
                     className={`w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 font-bold text-xs tracking-wider transition font-mono ${
                       simIsRunning
                         ? 'bg-emerald-900/40 text-emerald-500 border border-emerald-500/20 cursor-not-allowed'
-                        : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow shadow-emerald-600/10'
+                        : isDryRun
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow shadow-emerald-600/10'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white shadow shadow-blue-600/10 neon-glow-blue'
                     }`}
                   >
                     {simIsRunning ? (
                       <>
                         <Activity className="h-4 w-4 animate-spin text-emerald-400" />
-                        EXECUTING DRY-RUN...
+                        {isDryRun ? 'SIMULATING DRY-RUN...' : 'EXECUTING BLUEBERRY SWAP...'}
                       </>
                     ) : (
                       <>
-                        <Play className="h-4 w-4 fill-white" />
-                        EXECUTE DRY-RUN
+                        {isDryRun ? <Play className="h-4 w-4 fill-white" /> : <Zap className="h-4 w-4 text-amber-300 fill-amber-300" />}
+                        {isDryRun ? 'EXECUTE DRY-RUN' : 'EXECUTE BLUEBERRY SWAP'}
                       </>
                     )}
                   </button>
