@@ -17,7 +17,7 @@ import requests
 RPC_URL = "https://api.mainnet-beta.solana.com"
 QUOTE_URL = "https://api.jup.ag/swap/v1/quote"
 SWAP_URL = "https://api.jup.ag/swap/v6/swap"  # Jupiter's official high-performance transaction builder endpoint
-JUP_API_KEY = ""
+JUP_API_KEY = os.getenv("JUP_API_KEY", "15fecbfd-f16a-4d69-b4d6-0130de797456").strip()
 
 # 2. Token Mint Configurations (Solana Mainnet)
 MINTS = {
