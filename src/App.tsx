@@ -471,8 +471,8 @@ function ArbitrageDashboard() {
       `🔍 [2/6] Querying current liquidity pools: ${buyDEX} (${token}/SOL) and ${sellDEX} (${token}/SOL)...`,
       `📊 [3/6] Spot prices resolved: Buy Venue = ${res.buySpotPrice ? res.buySpotPrice.toLocaleString() : 'N/A'} ${token}/SOL, Sell Venue = ${res.sellSpotPrice ? res.sellSpotPrice.toLocaleString() : 'N/A'} ${token}/SOL`,
       `⚡ [4/6] Slippage analysis: Buy Slippage = ${res.buySlippage}%, Sell Slippage = ${res.sellSlippage}%`,
-      `📦 [5/6] Constructing multi-instruction Jito bundles with priority tip of ${priorityFee} SOL...`,
-      `🚀 [6/6] Submitting transaction bundle to searcher relayer networks...`
+      `📦 [5/6] Constructing multi-instruction swap transaction...`,
+      `🚀 [6/6] Simulating swap sequence via local simulation engine...`
     ] : [
       `⚙️ [1/6] CONNECTING TO LIVE SOLANA MAINNET WRITE RPC FEED: ${customRPC || 'https://api.mainnet-beta.solana.com'}`,
       `🔍 [2/6] Querying official Quote Endpoint: ${QUOTE_URL} (API Key loaded)`,
@@ -481,7 +481,7 @@ function ArbitrageDashboard() {
         : `📊 [3/6] LIVE JUPITER QUOTE MOCKED (CORS): OutAmount = ${(amt * (res.buySpotPrice || 140)).toFixed(4)} ${token}, Price Impact = 0.02%`,
       `⚡ [4/6] Real-time slippage & frontrun risk evaluation completed. JUP_API_KEY verified.`,
       `📦 [5/6] Routing transaction parameters to ${customRouter ? `Custom Router: ${customRouter}` : `Ultra-Base Endpoint: ${ORDER_URL}`}`,
-      `🚀 [6/6] Submitting execution transaction instructions packet directly to Jito Relayer: ${SWAP_URL}`
+      `🚀 [6/6] Submitting execution transaction instructions packet directly to Solana cluster: ${SWAP_URL}`
     ];
 
     let currentStep = 0;
@@ -516,9 +516,9 @@ function ArbitrageDashboard() {
           if (isProfitable) {
             setSimLog((prev) => [
               ...prev,
-              `🟢 SUCCESS: Arbitrage bundle successfully simulated and landed!`,
+              `🟢 SUCCESS: Arbitrage path successfully simulated and landed!`,
               `🎉 Gross Arbitrage Output: +${res.finalSOL} SOL`,
-              `⛽ Jito Priority Gas Paid: -${priorityFee} SOL`,
+              `⛽ Solana Priority Gas Paid: -${priorityFee} SOL`,
               `🛡️ Smoothy Profit Share Fee (0.5%): -${res.profitShareFee} SOL`,
               `💎 ESTIMATED NET RETURN: +${res.netProfit} SOL (Margin: +${res.grossMargin}%)`
             ]);
