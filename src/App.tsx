@@ -2,10 +2,10 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { ConnectionProvider, WalletProvider, useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
-import { LAMPORTS_PER_SOL, PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
+import { LAMPORTS_PER_SOL, Transaction, SystemProgram } from '@solana/web3.js';
 import { 
   Activity, Compass, Cpu, Play, Square, CheckCircle2, 
-  Coins, TrendingUp, Zap, Sparkles, ShieldCheck, 
+  Coins, TrendingUp, Zap, ShieldCheck, 
   Flame, Info, ArrowUpRight, ArrowDownRight, Award, ChevronRight,
   Volume2, VolumeX
 } from 'lucide-react';
@@ -83,15 +83,10 @@ function ArbitrageDashboard() {
     raydium: true,
     orca: true,
   });
-  const [activeTab, setActiveTab] = useState<'scan' | 'simulations' | 'premium'>('scan');
+  const [activeTab, setActiveTab] = useState<'scan' | 'simulations'>('scan');
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [isPremium, setIsPremium] = useState<boolean>(() => {
-    return localStorage.getItem('smoothy_premium_user') === 'true';
-  });
-  const [isPaying, setIsPaying] = useState<boolean>(false);
-  const [isDryRun, setIsDryRun] = useState<boolean>(true);
-  const [customRPC, setCustomRPC] = useState<string>('');
-  const [customRouter, setCustomRouter] = useState<string>('');
+  const isPremium = false;
+  const isDryRun = false;
 
   // Web Audio API Synthesized Chime/Sound Effects
   const playProfitSound = () => {
@@ -153,57 +148,6 @@ function ArbitrageDashboard() {
       osc.stop(ctx.currentTime + 0.25);
     } catch (e) {
       // ignore
-    }
-  };
-
-  const handleUnlockPriorityMode = async () => {
-    if (!connected || !publicKey) {
-      addLog('warn', '🔴 Connection required: Please connect your Phantom wallet to subscribe.');
-      alert('Please connect your Solana wallet first.');
-      return;
-    }
-    
-    setIsPaying(true);
-    addLog('info', '⌛ Preparing premium subscription transaction...');
-    
-    try {
-      const destination = new PublicKey('HqSmW6naRKm4irXNjjA73dgvwm1nAKDyUE99U52jRtxh');
-      const transaction = new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: publicKey,
-          toPubkey: destination,
-          lamports: 0.5 * LAMPORTS_PER_SOL,
-        })
-      );
-
-      // Get latest blockhash
-      addLog('info', '🔍 Retrieving latest blockhash from Solana cluster...');
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = publicKey;
-
-      addLog('info', '✍️ Prompting signature from Phantom wallet...');
-      const signature = await sendTransaction(transaction, connection);
-      addLog('info', `🚀 Transaction signed! Submitting on-chain: ${signature.slice(0, 8)}...`);
-
-      addLog('info', '⌛ Awaiting confirmation on Solana mainnet...');
-      await connection.confirmTransaction({
-        signature,
-        blockhash,
-        lastValidBlockHeight
-      }, 'confirmed');
-
-      addLog('success', '🎉 SUCCESS: Subscription transaction confirmed! Priority Mode activated.');
-      setIsPremium(true);
-      playProfitSound();
-      
-      // Permanently flag their local session as 'Premium'
-      localStorage.setItem('smoothy_premium_user', 'true');
-    } catch (err: any) {
-      console.error(err);
-      addLog('warn', `🔴 PAYMENT FAILED/REJECTED: ${err.message || 'User rejected the request or insufficient funds.'}`);
-    } finally {
-      setIsPaying(false);
     }
   };
 
@@ -484,13 +428,13 @@ function ArbitrageDashboard() {
       `📦 [5/6] Constructing multi-instruction swap transaction...`,
       `🚀 [6/6] Simulating swap sequence via local simulation engine...`
     ] : [
-      `⚙️ [1/6] CONNECTING TO LIVE SOLANA MAINNET WRITE RPC FEED: ${customRPC || 'https://api.mainnet-beta.solana.com'}`,
+      `⚙️ [1/6] CONNECTING TO LIVE SOLANA MAINNET WRITE RPC FEED: https://api.mainnet-beta.solana.com`,
       `🔍 [2/6] Querying official Quote Endpoint: ${QUOTE_URL} (API Key loaded)`,
       liveQuoteData 
         ? `📊 [3/6] LIVE JUPITER QUOTE ACQUIRED: OutAmount = ${(parseInt(liveQuoteData.outAmount) / (token === 'USDC' ? 1e6 : token === 'BONK' ? 1e5 : 1e9)).toFixed(4)} ${token}, Price Impact = ${liveQuoteData.priceImpactPct || '0.01'}%`
         : `📊 [3/6] LIVE JUPITER QUOTE MOCKED (CORS): OutAmount = ${(amt * (res.buySpotPrice || 140)).toFixed(4)} ${token}, Price Impact = 0.02%`,
       `⚡ [4/6] Real-time slippage & frontrun risk evaluation completed. JUP_API_KEY verified.`,
-      `📦 [5/6] Routing transaction parameters to ${customRouter ? `Custom Router: ${customRouter}` : `Ultra-Base Endpoint: ${ORDER_URL}`}`,
+      `📦 [5/6] Routing transaction parameters to Ultra-Base Endpoint: ${ORDER_URL}`,
       `🚀 [6/6] Submitting execution transaction instructions packet directly to Solana cluster: ${SWAP_URL}`
     ];
 
@@ -536,21 +480,13 @@ function ArbitrageDashboard() {
             
             // Wait 1.2 seconds and finalize the mock/custom success sequence
             setTimeout(() => {
-              const hasCustom = customRPC && customRouter;
               setSimLog((prev) => [
                 ...prev,
-                hasCustom 
-                  ? `🟢 [AUTHORIZED] Live instruction packet successfully validated using your custom write-endpoint and router address!`
-                  : `⚠️ LIVE MAINNET BROADCAST REVERTED: To protect your assets, direct live transaction broadcasting is locked inside this demonstration sandbox.`,
-                hasCustom
-                  ? `🛡️ CUSTOM BROADCAST SIMULATION LANDED: Atomic multi-instruction bundle successfully compiled and verified against custom node.`
-                  : `💡 Execution requires an active high-performance custom RPC write-endpoint and protocol contract router authorization.`,
+                `⚠️ LIVE MAINNET BROADCAST REVERTED: To protect your assets, direct live transaction broadcasting is locked inside this demonstration sandbox.`,
+                `💡 Execution requires an active high-performance custom RPC write-endpoint and protocol contract router authorization.`,
                 `🛡️ Capital preserved. Reverting to virtual dry-run environment.`
               ]);
-              addLog('warn', hasCustom 
-                ? `Live execution on SOL➔${token}➔SOL simulated against custom node.`
-                : `Live execution on SOL➔${token}➔SOL safe-reverted (Write-endpoint read-only).`
-              );
+              addLog('warn', `Live execution on SOL➔${token}➔SOL safe-reverted (Write-endpoint read-only).`);
               playWarnSound();
               setSimIsRunning(false);
             }, 1200);
@@ -574,21 +510,13 @@ function ArbitrageDashboard() {
         clearInterval(interval);
         
         if (!isDryRun) {
-          const hasCustom = customRPC && customRouter;
           setSimLog((prev) => [
             ...prev,
-            hasCustom 
-              ? `🟢 [AUTHORIZED] Live instruction packet successfully validated using your custom write-endpoint and router address!`
-              : `⚠️ LIVE MAINNET BROADCAST REVERTED: To protect your assets, direct live transaction broadcasting is locked inside this demonstration sandbox.`,
-            hasCustom
-              ? `🛡️ CUSTOM BROADCAST SIMULATION LANDED: Atomic multi-instruction bundle successfully compiled and verified against custom node.`
-              : `💡 Execution requires an active high-performance custom RPC write-endpoint and protocol contract router authorization.`,
+            `⚠️ LIVE MAINNET BROADCAST REVERTED: To protect your assets, direct live transaction broadcasting is locked inside this demonstration sandbox.`,
+            `💡 Execution requires an active high-performance custom RPC write-endpoint and protocol contract router authorization.`,
             `🛡️ Capital preserved. Reverting to virtual dry-run environment.`
           ]);
-          addLog('warn', hasCustom 
-            ? `Live execution on SOL➔${token}➔SOL simulated against custom node.`
-            : `Live execution on SOL➔${token}➔SOL safe-reverted (Write-endpoint read-only).`
-          );
+          addLog('warn', `Live execution on SOL➔${token}➔SOL safe-reverted (Write-endpoint read-only).`);
           playWarnSound();
         } else if (res.success) {
           setSimResult(res);
@@ -869,85 +797,6 @@ function ArbitrageDashboard() {
               </div>
             </div>
 
-            {/* Execution / Dry Run Mode */}
-            <div className="mb-5 border-t border-gray-800/60 pt-4">
-              <label className="block text-xs text-gray-400 font-semibold mb-2">
-                EXECUTION MODE (DRY RUN)
-              </label>
-              <div className="grid grid-cols-2 gap-3 mb-2">
-                <button
-                  type="button"
-                  onClick={() => setIsDryRun(true)}
-                  className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border text-xs font-semibold transition ${
-                    isDryRun
-                      ? 'bg-emerald-600/15 border-emerald-500 text-emerald-300'
-                      : 'bg-transparent border-gray-800 text-gray-500 hover:border-gray-700'
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${isDryRun ? 'bg-emerald-400' : 'bg-gray-700'}`}></span>
-                  Dry Run Enabled
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsDryRun(false)}
-                  className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border text-xs font-semibold transition ${
-                    !isDryRun
-                      ? 'bg-blue-600/15 border-blue-500 text-blue-300 shadow-blue-500/5'
-                      : 'bg-transparent border-gray-800 text-gray-500 hover:border-gray-700'
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${!isDryRun ? 'bg-blue-400' : 'bg-gray-700'}`}></span>
-                  Dry Run Disabled
-                </button>
-              </div>
-
-              {/* Informative Note describing both enabled and disabled states */}
-              <div className="p-2.5 bg-[#070b14]/50 border border-gray-800/60 rounded-lg text-[10.5px] text-gray-400 leading-normal space-y-1">
-                {isDryRun ? (
-                  <p>
-                    <span className="text-emerald-400 font-semibold">✓ Dry Run Enabled (Safe Mode):</span> Executes multi-instruction transactions in a virtual sandbox environment. Simulates locks, analyzes price slippage, and verifies profit mathematically before any actual funds are sent. <span className="text-white">Zero capital is at risk.</span>
-                  </p>
-                ) : (
-                  <p>
-                    <span className="text-blue-400 font-semibold">⚡ Dry Run Disabled (Live Execution):</span> Prepares to route swaps directly onto the live Solana Mainnet. Requires actual tokens and high-priority Jito gas fees (Jito tip). <span className="text-white">Subject to market slippage, transaction failure, and competition from institutional high-frequency searcher bots.</span>
-                  </p>
-                )}
-              </div>
-
-              {/* Optional Custom RPC and Router Address Config */}
-              {!isDryRun && (
-                <div className="mt-3 space-y-3 p-3 bg-[#070b14]/80 border border-blue-500/20 rounded-lg animate-fade-in text-left">
-                  <p className="text-[10px] font-mono font-semibold text-blue-400 tracking-wider uppercase leading-none mb-1">
-                    Custom Write Infrastructure (Optional)
-                  </p>
-                  <div>
-                    <label className="block text-[9px] text-gray-400 font-semibold mb-1 font-mono uppercase">
-                      Custom RPC Write-Endpoint (HTTPS)
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full bg-[#070b14] border border-gray-800 rounded px-2.5 py-1.5 text-xs font-mono text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 transition"
-                      placeholder="e.g. https://solana-mainnet.g.allmystack.run"
-                      value={customRPC}
-                      onChange={(e) => setCustomRPC(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[9px] text-gray-400 font-semibold mb-1 font-mono uppercase">
-                      Contract Router Authorization (Pubkey)
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full bg-[#070b14] border border-gray-800 rounded px-2.5 py-1.5 text-xs font-mono text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 transition"
-                      placeholder="e.g. HqSmW6naRKm4irXNjjA73dgvwm1nAKDyUE99U52jRtxh"
-                      value={customRouter}
-                      onChange={(e) => setCustomRouter(e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* Run Button */}
             <button
               type="button"
@@ -1065,18 +914,6 @@ function ArbitrageDashboard() {
                 <TrendingUp className="h-4 w-4" />
                 Blueberry Simulator
               </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('premium')}
-                className={`flex-1 py-2.5 px-4 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition ${
-                  activeTab === 'premium'
-                    ? 'bg-emerald-600 text-white shadow'
-                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/30'
-                }`}
-              >
-                <Sparkles className="h-4 w-4 text-amber-400" />
-                Priority SaaS
-              </button>
             </div>
           </div>
 
@@ -1192,16 +1029,12 @@ function ArbitrageDashboard() {
                                 disabled={simIsRunning}
                                 className={`w-full py-2 px-4 rounded-lg font-bold text-xs transition border flex items-center justify-center gap-1 ${
                                   isProfitable
-                                    ? isDryRun
-                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent shadow shadow-emerald-500/5'
-                                      : 'bg-blue-600 hover:bg-blue-700 text-white border-transparent shadow shadow-blue-500/5'
+                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent shadow shadow-emerald-500/5'
                                     : 'bg-transparent hover:bg-gray-800 text-gray-400 border-gray-800'
                                 }`}
                               >
                                 <Zap className="h-3.5 w-3.5" />
-                                {isProfitable 
-                                  ? isDryRun ? 'Simulate Swap' : 'Blueberry Swap'
-                                  : 'Ignore Route'}
+                                {isProfitable ? 'Swap' : 'Ignore Route'}
                               </button>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 font-mono py-1">
@@ -1380,20 +1213,18 @@ function ArbitrageDashboard() {
                     className={`w-full py-3 px-4 rounded-xl flex items-center justify-center gap-2 font-bold text-xs tracking-wider transition font-mono ${
                       simIsRunning
                         ? 'bg-emerald-900/40 text-emerald-500 border border-emerald-500/20 cursor-not-allowed'
-                        : isDryRun
-                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow shadow-emerald-600/10'
-                          : 'bg-blue-600 hover:bg-blue-700 text-white shadow shadow-blue-600/10 neon-glow-blue'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow shadow-emerald-600/10'
                     }`}
                   >
                     {simIsRunning ? (
                       <>
                         <Activity className="h-4 w-4 animate-spin text-emerald-400" />
-                        {isDryRun ? 'SIMULATING DRY-RUN...' : 'EXECUTING BLUEBERRY SWAP...'}
+                        EXECUTING BLUEBERRY SWAP...
                       </>
                     ) : (
                       <>
-                        {isDryRun ? <Play className="h-4 w-4 fill-white" /> : <Zap className="h-4 w-4 text-amber-300 fill-amber-300" />}
-                        {isDryRun ? 'EXECUTE DRY-RUN' : 'EXECUTE BLUEBERRY SWAP'}
+                        <Zap className="h-4 w-4 text-amber-300 fill-amber-300" />
+                        BLUEBERRY SWAP
                       </>
                     )}
                   </button>
@@ -1527,118 +1358,6 @@ function ArbitrageDashboard() {
 
               </div>
 
-            </div>
-          )}
-
-          {/* TAB 3: Priority SaaS Premium */}
-          {activeTab === 'premium' && (
-            <div className="bg-[#0e1628] border border-gray-800 rounded-xl p-5 shadow-sm flex flex-col flex-1 min-h-[500px]">
-              <div className="text-center py-6 border-b border-gray-800">
-                <div className="inline-block bg-emerald-500/10 p-3 border border-emerald-500/20 rounded-2xl mb-3">
-                  <Sparkles className="h-8 w-8 text-amber-400" />
-                </div>
-                <h2 className="text-lg font-bold text-white mb-1">Upgrade to Smoothy Cream Tier</h2>
-                <p className="text-xs text-gray-400 max-w-sm mx-auto">
-                  Unlock premium sub-second RPC feeds, high-priority Jito bundles, and fully automated executor workflows.
-                </p>
-              </div>
-
-              {/* Smoothie Cream Tiers Grid */}
-              <div className="my-5">
-                <label className="block text-[11px] text-gray-400 font-bold mb-2.5 font-mono uppercase tracking-wider text-center">
-                  🥛 SMOOTHY LIQUID REFRESHTIME MENU
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                  {/* Tier 1 */}
-                  <div className={`p-3 bg-[#0a101d] border rounded-xl flex flex-col justify-between ${!isPremium ? 'border-blue-500/40 bg-blue-950/5' : 'border-gray-800/80 opacity-60'}`}>
-                    <div className="flex items-center justify-between mb-1.5 font-mono">
-                      <span className="text-lg">🧁</span>
-                      <span className="text-[9px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded font-bold">STANDARD</span>
-                    </div>
-                    <h4 className="text-xs font-bold text-white mb-0.5 font-sans">Blueberry Cream</h4>
-                    <p className="text-[10px] text-gray-400 m-0 leading-normal font-mono">
-                      Standard scan latency (3.0s interval). Deep pool surveillance.
-                    </p>
-                  </div>
-                  {/* Tier 2 */}
-                  <div className="p-3 bg-[#0a101d] border border-gray-800/80 rounded-xl flex flex-col justify-between opacity-80">
-                    <div className="flex items-center justify-between mb-1.5 font-mono">
-                      <span className="text-lg">🌴</span>
-                      <span className="text-[9px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded font-bold">SIMULATION</span>
-                    </div>
-                    <h4 className="text-xs font-bold text-white mb-0.5 font-sans">Passion Fruit Cream</h4>
-                    <p className="text-[10px] text-gray-400 m-0 leading-normal font-mono">
-                      High priority simulation (800ms pipeline steps, Jito bundle dry-runs).
-                    </p>
-                  </div>
-                  {/* Tier 3 */}
-                  <div className={`p-3 bg-[#0a101d] border rounded-xl flex flex-col justify-between ${isPremium ? 'border-amber-500/40 bg-amber-950/10 neon-glow-cream' : 'border-gray-800/80'}`}>
-                    <div className="flex items-center justify-between mb-1.5 font-mono">
-                      <span className="text-lg">🍹</span>
-                      <span className="text-[9px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-bold neon-text-gold">SaaS PRO</span>
-                    </div>
-                    <h4 className="text-xs font-bold text-amber-400 mb-0.5 font-sans neon-text-gold">Smoothy Cream</h4>
-                    <p className="text-[10px] text-gray-400 m-0 leading-normal font-mono">
-                      Sub-second scan latency (800ms intervals). Accelerated real-time RPC.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Premium Perks Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
-                <div className="p-4 bg-[#0a101d] border border-gray-800 rounded-xl">
-                  <Zap className="h-5 w-5 text-amber-400 mb-2" />
-                  <h3 className="text-xs font-bold text-white mb-1 font-mono uppercase">Smoothy Cream Scanning</h3>
-                  <p className="text-[11px] text-gray-400 leading-normal">
-                    Queries DEX pools down to 100ms. Spot pricing discrepancies ahead of institutional searchers.
-                  </p>
-                </div>
-                <div className="p-4 bg-[#0a101d] border border-gray-800 rounded-xl">
-                  <Activity className="h-5 w-5 text-emerald-400 mb-2" />
-                  <h3 className="text-xs font-bold text-white mb-1 font-mono uppercase">Passion Fruit Cream Jito</h3>
-                  <p className="text-[11px] text-gray-400 leading-normal">
-                    Direct access to Jito blockspace searcher network. Out-bid standard RPC transactions.
-                  </p>
-                </div>
-                <div className="p-4 bg-[#0a101d] border border-gray-800 rounded-xl">
-                  <Cpu className="h-5 w-5 text-emerald-400 mb-2" />
-                  <h3 className="text-xs font-bold text-white mb-1 font-mono uppercase">Autonomous Auto-Run</h3>
-                  <p className="text-[11px] text-gray-400 leading-normal">
-                    Configure thresholds and let the bot route and execute opportunities automatically 24/7.
-                  </p>
-                </div>
-                <div className="p-4 bg-[#0a101d] border border-gray-800 rounded-xl">
-                  <ShieldCheck className="h-5 w-5 text-blue-400 mb-2" />
-                  <h3 className="text-xs font-bold text-white mb-1 font-mono uppercase">Gas Fee Protection</h3>
-                  <p className="text-[11px] text-gray-400 leading-normal">
-                    Zero failed trade fees. Advanced flashloans absorb reverting costs completely.
-                  </p>
-                </div>
-              </div>
-
-              {/* Pricing Call to Action */}
-              <div className="mt-auto bg-gradient-to-r from-emerald-950/40 to-emerald-900/40 border border-emerald-500/20 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-lg font-extrabold text-white font-mono">0.5 SOL</span>
-                    <span className="text-xs text-gray-400 font-sans">/ month</span>
-                  </div>
-                  <p className="text-[10px] text-gray-400 m-0">Cancel anytime. 100% risk-free.</p>
-                </div>
-                <button
-                  type="button"
-                  disabled={isPremium || isPaying}
-                  onClick={handleUnlockPriorityMode}
-                  className={`font-bold text-xs py-2.5 px-5 rounded-lg transition ${
-                    isPremium 
-                      ? 'bg-amber-500/25 text-amber-400 border border-amber-500/30 neon-text-gold cursor-default'
-                      : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow shadow-emerald-600/10'
-                  }`}
-                >
-                  {isPaying ? 'TRANSACTING...' : isPremium ? 'PREMIUM ACTIVE (PRO)' : 'Unlock Priority Mode'}
-                </button>
-              </div>
             </div>
           )}
 
