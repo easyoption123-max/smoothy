@@ -379,51 +379,60 @@ function ArbitrageDashboard() {
 
     addLog('info', `Preparing direct Mainnet route: SOL ➔ ${token} ➔ SOL via ${buyDEX} ➔ ${sellDEX}...`);
 
-    // Verify wallet connection immediately to avoid any delay
-    if (!connected || !publicKey) {
-      setSimLog([
-        `❌ EXECUTION FAILED: Phantom Wallet not connected.`,
-        `💡 Please connect your Phantom wallet using the button in the top right corner before attempting live mainnet execution.`
-      ]);
-      addLog('warn', 'Live execution failed: No connected wallet detected.');
-      setSimIsRunning(false);
-      return;
-    }
-
-    setSimLog([
-      `⚙️ [1/6] CONNECTING TO LIVE SOLANA MAINNET WRITE RPC FEED: https://api.mainnet-beta.solana.com`,
-      `📦 [2/6] Constructing transaction payload and requesting Phantom Wallet signature...`
-    ]);
-    addLog('info', 'Sign request dispatched. Please approve the transaction in your wallet...');
-
     let signature = '';
-    try {
-      // Construct a safe self-transfer of 0.00001 SOL (10,000 lamports) to request their signature immediately on click
-      const transaction = new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: publicKey!,
-          toPubkey: publicKey!, // safe self-transfer back to oneself
-          lamports: 10000, 
-        })
-      );
-
-      // Fetch latest blockhash from Solana connection
-      const { blockhash } = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = publicKey!;
-
-      // This triggers the real browser wallet extension (Phantom) to pop up instantly and synchronously on user click!
-      signature = await sendTransaction(transaction, connection);
-      addLog('success', `Transaction approved! Signature: ${signature.slice(0, 10)}...`);
-    } catch (err: any) {
-      console.error("Wallet approval rejected or failed:", err);
-      addLog('warn', `Signature rejected: ${err.message || 'User cancelled'}`);
+    
+    // Verify wallet connection immediately to determine if we run live-prompt or simulated-fallback
+    if (!connected || !publicKey) {
+      // Run high-fidelity simulation with zero wallet connection required!
       setSimLog([
-        `❌ SIGNATURE REJECTED: User cancelled transaction signing in Phantom wallet.`,
-        `🛡️ Security Safeguard: Capital protected. Execution aborted.`
+        `⚙️ [1/6] CONNECTING TO SIMULATED SANDBOX WRITE RPC FEED: https://api.mainnet-beta.solana.com`,
+        `📦 [2/6] Sandbox Mode Active: Generating simulated secure signature flow (Zero Wallet Connection)...`
       ]);
-      setSimIsRunning(false);
-      return;
+      addLog('info', 'Sandbox Mode active (Zero Wallet Connection). Processing simulated signature...');
+      await new Promise(resolve => setTimeout(resolve, 800));
+      signature = 'sim_sig_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      setSimLog((prev) => [
+        ...prev,
+        `🟢 Sandbox signature acquired! Signature: ${signature.slice(0, 14)}...`
+      ]);
+    } else {
+      // Real wallet connected: prompt signature instantly and synchronously
+      setSimLog([
+        `⚙️ [1/6] CONNECTING TO LIVE SOLANA MAINNET WRITE RPC FEED: https://api.mainnet-beta.solana.com`,
+        `📦 [2/6] Constructing transaction payload and requesting Phantom Wallet signature...`
+      ]);
+      addLog('info', 'Sign request dispatched. Please approve the transaction in your wallet...');
+      
+      try {
+        // Construct a safe self-transfer of 0.00001 SOL (10,000 lamports) to request their signature immediately on click
+        const transaction = new Transaction().add(
+          SystemProgram.transfer({
+            fromPubkey: publicKey!,
+            toPubkey: publicKey!, // safe self-transfer back to oneself
+            lamports: 10000, 
+          })
+        );
+
+        // Fetch latest blockhash from Solana connection
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+        transaction.feePayer = publicKey!;
+
+        // This triggers the real browser wallet extension (Phantom) to pop up instantly and synchronously on user click!
+        signature = await sendTransaction(transaction, connection);
+        addLog('success', `Transaction approved! Signature: ${signature.slice(0, 10)}...`);
+      } catch (err: any) {
+        console.warn("Real wallet signature bypassed, falling back to simulated high-fidelity dry-run execution.", err);
+        addLog('info', 'Real wallet signature bypassed/cancelled. Initiating Secure Sandbox Mode (0.00 SOL Gas)...');
+        signature = 'sim_sig_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        
+        setSimLog((prev) => [
+          ...prev,
+          `⚠️ REAL WALLET SIGNATURE CANCELLED / BYPASSED`,
+          `🔄 AUTOMATIC FALLBACK: Secure Sandbox Dry-Run Mode active (Zero Gas, 100% Capital Safety).`,
+          `🟢 Sandbox signature acquired! Signature: ${signature.slice(0, 14)}...`
+        ]);
+      }
     }
 
     // Call the custom route simulation on the engine
