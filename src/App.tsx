@@ -72,11 +72,38 @@ function SourceCodeTemplatePaywall() {
   const [isBuying, setIsBuying] = useState<boolean>(false);
   const [buyStatus, setBuyStatus] = useState<string>('');
   const [txSignature, setTxSignature] = useState<string>('');
+  
+  const [solPrice, setSolPrice] = useState<number>(145.00); // Default fallback SOL-USD price
+  const [isLoadingPrice, setIsLoadingPrice] = useState<boolean>(true);
+
+  useEffect(() => {
+    const fetchSolPrice = async () => {
+      try {
+        setIsLoadingPrice(true);
+        const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+        const data = await res.json();
+        if (data && data.solana && data.solana.usd) {
+          setSolPrice(data.solana.usd);
+          console.log(`Live SOL-USD Price Loaded: ${data.solana.usd}`);
+        }
+      } catch (e) {
+        console.warn('Could not fetch live SOL price, using fallback rate of $145.00:', e);
+      } finally {
+        setIsLoadingPrice(false);
+      }
+    };
+    fetchSolPrice();
+  }, []);
+
+  const targetUSD = 39.00;
+  const solAmountRequired = useMemo(() => {
+    return Number((targetUSD / solPrice).toFixed(4));
+  }, [solPrice]);
 
   const handlePurchase = async (isSimulated: boolean = false) => {
     if (isSimulated) {
       setIsBuying(true);
-      setBuyStatus("⚙️ Sandbox Checkout Active: Constructing mock 0.5 SOL transaction...");
+      setBuyStatus(`⚙️ Sandbox Checkout Active: Constructing mock ${solAmountRequired} SOL transaction (${targetUSD.toFixed(2)} USD)...`);
       await new Promise(resolve => setTimeout(resolve, 800));
       setBuyStatus("📦 Dispatched simulated Phantom signature request. Approving automatically...");
       await new Promise(resolve => setTimeout(resolve, 800));
@@ -96,7 +123,7 @@ function SourceCodeTemplatePaywall() {
     }
     
     setIsBuying(true);
-    setBuyStatus("⚙️ Constructing 0.5 SOL transfer transaction payload...");
+    setBuyStatus(`⚙️ Constructing ${solAmountRequired} SOL (${targetUSD.toFixed(2)} USD) transfer transaction payload...`);
     
     try {
       const destination = new PublicKey("HqSmW6naRKm4irXNjjA73dgvwm1nAKDyUE99U52jRtxh");
@@ -105,7 +132,7 @@ function SourceCodeTemplatePaywall() {
         SystemProgram.transfer({
           fromPubkey: publicKey,
           toPubkey: destination,
-          lamports: 0.5 * 1_000_000_000, // 0.5 SOL
+          lamports: Math.round(solAmountRequired * 1_000_000_000), // convert to lamports safely
         })
       );
       
@@ -113,7 +140,7 @@ function SourceCodeTemplatePaywall() {
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = publicKey;
       
-      setBuyStatus("📦 Dispatched signature request to your Phantom wallet. Please approve the 0.5 SOL transfer...");
+      setBuyStatus(`📦 Dispatched signature request to your Phantom wallet. Please approve the ${solAmountRequired} SOL transfer...`);
       const signature = await sendTransaction(transaction, connection);
       
       setBuyStatus("⚡ Transaction signed! Confirming block settlement on Solana mainnet...");
@@ -128,7 +155,7 @@ function SourceCodeTemplatePaywall() {
       setTxSignature(signature);
       setIsPurchased(true);
       localStorage.setItem('smoothy_code_template_purchased', 'true');
-      setBuyStatus("🟢 Success! 0.5 SOL payment confirmed on-chain. Source code package unlocked!");
+      setBuyStatus(`🟢 Success! ${solAmountRequired} SOL payment confirmed on-chain. Source code package unlocked!`);
     } catch (err: any) {
       console.error("Purchase error:", err);
       setBuyStatus(`❌ Purchase aborted: ${err.message || 'Signature rejected or network issue.'}`);
@@ -210,9 +237,14 @@ function SourceCodeTemplatePaywall() {
                 <h4 className="text-sm font-bold text-white uppercase tracking-wider">Source Code Locked</h4>
                 <p className="text-[11px] text-gray-400 max-w-[280px] mx-auto mt-1">Unlock peer-to-peer using SOL or simulate the checkout flow in test-drive mode.</p>
                 
-                <div className="mt-4 inline-flex items-baseline gap-1.5">
-                  <span className="text-2xl font-black text-white font-mono">0.5</span>
-                  <span className="text-xs font-bold text-emerald-400 font-mono">SOL</span>
+                <div className="mt-4 flex flex-col items-center justify-center">
+                  <div className="inline-flex items-baseline gap-1.5">
+                    <span className="text-2xl font-black text-white font-mono">{isLoadingPrice ? '...' : solAmountRequired}</span>
+                    <span className="text-xs font-bold text-emerald-400 font-mono">SOL</span>
+                  </div>
+                  <span className="text-[10px] text-gray-500 font-mono mt-1">
+                    (Pegged dynamically to exactly ${targetUSD.toFixed(2)} USD • Live: 1 SOL = ${solPrice.toFixed(2)} USD)
+                  </span>
                 </div>
               </div>
 
@@ -228,7 +260,7 @@ function SourceCodeTemplatePaywall() {
                   }`}
                 >
                   <Zap className="h-4 w-4 text-amber-300 fill-amber-300" />
-                  UNLOCK WITH PHANTOM (0.5 SOL)
+                  UNLOCK WITH PHANTOM ({isLoadingPrice ? '...' : `${solAmountRequired} SOL`})
                 </button>
 
                 <button
