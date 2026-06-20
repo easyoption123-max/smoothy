@@ -2,9 +2,9 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { ConnectionProvider, WalletProvider, useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
-import { LAMPORTS_PER_SOL, Transaction, SystemProgram } from '@solana/web3.js';
+import { LAMPORTS_PER_SOL, Transaction, SystemProgram, PublicKey } from '@solana/web3.js';
 import { 
-  Activity, Compass, Cpu, Play, Square, CheckCircle2, 
+  Activity, Compass, Cpu, Play, Square, CheckCircle2, Code, Download, Lock,
   Coins, TrendingUp, Zap, ShieldCheck, 
   Flame, Info, ArrowUpRight, ArrowDownRight, Award, ChevronRight,
   Volume2, VolumeX
@@ -65,6 +65,228 @@ export default function App() {
   );
 }
 
+function SourceCodeTemplatePaywall() {
+  const { connection } = useConnection();
+  const { publicKey, connected, sendTransaction } = useWallet();
+  const [isPurchased, setIsPurchased] = useState<boolean>(() => localStorage.getItem('smoothy_code_template_purchased') === 'true');
+  const [isBuying, setIsBuying] = useState<boolean>(false);
+  const [buyStatus, setBuyStatus] = useState<string>('');
+  const [txSignature, setTxSignature] = useState<string>('');
+
+  const handlePurchase = async (isSimulated: boolean = false) => {
+    if (isSimulated) {
+      setIsBuying(true);
+      setBuyStatus("⚙️ Sandbox Checkout Active: Constructing mock 0.5 SOL transaction...");
+      await new Promise(resolve => setTimeout(resolve, 800));
+      setBuyStatus("📦 Dispatched simulated Phantom signature request. Approving automatically...");
+      await new Promise(resolve => setTimeout(resolve, 800));
+      setBuyStatus("⚡ Sandbox signature acquired! Confirming mock block settlement on cluster...");
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      setIsPurchased(true);
+      localStorage.setItem('smoothy_code_template_purchased', 'true');
+      setBuyStatus("🟢 Success! Sandbox checkout confirmed. Source code package unlocked!");
+      setIsBuying(false);
+      return;
+    }
+
+    if (!connected || !publicKey) {
+      setBuyStatus("❌ Error: Please connect your Phantom wallet using the button in the top-right corner before attempting mainnet purchase.");
+      return;
+    }
+    
+    setIsBuying(true);
+    setBuyStatus("⚙️ Constructing 0.5 SOL transfer transaction payload...");
+    
+    try {
+      const destination = new PublicKey("HqSmW6naRKm4irXNjjA73dgvwm1nAKDyUE99U52jRtxh");
+      
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: publicKey,
+          toPubkey: destination,
+          lamports: 0.5 * 1_000_000_000, // 0.5 SOL
+        })
+      );
+      
+      const { blockhash } = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = publicKey;
+      
+      setBuyStatus("📦 Dispatched signature request to your Phantom wallet. Please approve the 0.5 SOL transfer...");
+      const signature = await sendTransaction(transaction, connection);
+      
+      setBuyStatus("⚡ Transaction signed! Confirming block settlement on Solana mainnet...");
+      
+      const latestBlockhash = await connection.getLatestBlockhash();
+      await connection.confirmTransaction({
+        signature,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      }, 'confirmed');
+      
+      setTxSignature(signature);
+      setIsPurchased(true);
+      localStorage.setItem('smoothy_code_template_purchased', 'true');
+      setBuyStatus("🟢 Success! 0.5 SOL payment confirmed on-chain. Source code package unlocked!");
+    } catch (err: any) {
+      console.error("Purchase error:", err);
+      setBuyStatus(`❌ Purchase aborted: ${err.message || 'Signature rejected or network issue.'}`);
+    } finally {
+      setIsBuying(false);
+    }
+  };
+
+  const resetPurchase = () => {
+    localStorage.removeItem('smoothy_code_template_purchased');
+    setIsPurchased(false);
+    setBuyStatus('');
+    setTxSignature('');
+  };
+
+  return (
+    <div className="bg-[#0e1628] border border-gray-800 rounded-xl p-6 shadow-sm flex flex-col flex-1 min-h-[500px]">
+      <div className="flex items-center justify-between mb-4 border-b border-gray-800 pb-3">
+        <div>
+          <h3 className="text-sm font-extrabold text-white font-mono uppercase tracking-wider flex items-center gap-1.5">
+            <Code className="h-4 w-4 text-emerald-400" />
+            Smoothy Source Code Template Package
+          </h3>
+          <p className="text-[11px] text-gray-400 mt-0.5">Deploy your own real-time Solana arbitrage terminal with zero platform friction.</p>
+        </div>
+        <span className="px-2 py-0.5 text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono rounded">
+          v1.2.0
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
+        {/* Left Card: Features Included */}
+        <div className="bg-[#0a101d] border border-gray-800 rounded-xl p-5 flex flex-col gap-4">
+          <span className="text-[10px] text-gray-400 font-bold font-mono uppercase tracking-wider block">
+            What's Included in the ZIP Package:
+          </span>
+          <ul className="flex flex-col gap-3 text-xs text-gray-300">
+            <li className="flex items-start gap-2">
+              <span className="text-emerald-400">⚡</span>
+              <div>
+                <strong className="text-white">Complete Vite + React Frontend:</strong> Fully responsive Tailwind UI styled with the creamy mint-green smoothie theme.
+              </div>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-emerald-400">⚡</span>
+              <div>
+                <strong className="text-white">Constant-Product AMM Simulator Engine:</strong> Sandbox pricing math and routing logic mapping out Jupiter, Raydium, and Orca liquidity pools.
+              </div>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-emerald-400">⚡</span>
+              <div>
+                <strong className="text-white">Flawless Wallet signature UX:</strong> Synchronous Phantom signer flow with automated graceful fallback to simulated sandbox executions.
+              </div>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-emerald-400">⚡</span>
+              <div>
+                <strong className="text-white">Python CLI Automation Engine:</strong> Fully functional CLI script with network-resilient mock fallbacks for restricted testing.
+              </div>
+            </li>
+          </ul>
+
+          <div className="mt-auto p-3 bg-emerald-950/10 border border-emerald-500/20 rounded-lg text-[10px] text-emerald-400 leading-relaxed font-mono flex items-start gap-2">
+            <ShieldCheck className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold text-white uppercase block mb-0.5">100% Secure & Compliant</span>
+              This transaction is executed peer-to-peer directly on the Solana Blockchain. Your wallet details remain private and safe.
+            </div>
+          </div>
+        </div>
+
+        {/* Right Card: Checkout / Unlock Area */}
+        <div className="bg-[#0a101d] border border-gray-800 rounded-xl p-5 flex flex-col justify-between min-h-[300px]">
+          {!isPurchased ? (
+            <div className="flex flex-col gap-5 h-full justify-between">
+              <div className="text-center py-6">
+                <Lock className="h-10 w-10 text-emerald-400 mx-auto mb-2.5 animate-pulse" />
+                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Source Code Locked</h4>
+                <p className="text-[11px] text-gray-400 max-w-[280px] mx-auto mt-1">Unlock peer-to-peer using SOL or simulate the checkout flow in test-drive mode.</p>
+                
+                <div className="mt-4 inline-flex items-baseline gap-1.5">
+                  <span className="text-2xl font-black text-white font-mono">0.5</span>
+                  <span className="text-xs font-bold text-emerald-400 font-mono">SOL</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 mt-auto">
+                <button
+                  type="button"
+                  disabled={isBuying}
+                  onClick={() => handlePurchase(false)}
+                  className={`w-full py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 font-bold text-xs tracking-wider transition font-mono ${
+                    isBuying
+                      ? 'bg-emerald-900/40 text-emerald-500 border border-emerald-500/20 cursor-not-allowed'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow shadow-emerald-600/10'
+                  }`}
+                >
+                  <Zap className="h-4 w-4 text-amber-300 fill-amber-300" />
+                  UNLOCK WITH PHANTOM (0.5 SOL)
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isBuying}
+                  onClick={() => handlePurchase(true)}
+                  className="w-full py-2.5 px-4 rounded-lg bg-transparent hover:bg-gray-800/40 text-gray-400 hover:text-gray-200 border border-gray-800 text-[11px] font-bold tracking-wider transition font-mono"
+                >
+                  Simulate Purchase (Test-Drive)
+                </button>
+
+                {buyStatus && (
+                  <div className="p-3 bg-[#070b14] border border-gray-800 rounded-lg text-[10px] text-gray-300 font-mono leading-relaxed mt-2">
+                    {buyStatus}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-5 h-full justify-between">
+              <div className="text-center py-6">
+                <CheckCircle2 className="h-10 w-10 text-emerald-400 mx-auto mb-2.5" />
+                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Template Unlocked!</h4>
+                <p className="text-[11px] text-gray-400 max-w-[280px] mx-auto mt-1">Thank you for your purchase. You can now download the fully packaged template.</p>
+                
+                {txSignature && (
+                  <div className="mt-3 text-[9px] text-gray-500 font-mono truncate max-w-[250px] mx-auto">
+                    Tx: {txSignature}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-3 mt-auto">
+                <a
+                  href="/smoothy-source-code.zip"
+                  download="smoothy-source-code.zip"
+                  className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-2 font-bold text-xs tracking-wider transition font-mono text-center shadow shadow-emerald-600/10"
+                >
+                  <Download className="h-4 w-4" />
+                  DOWNLOAD SOURCE CODE (.ZIP)
+                </a>
+
+                <button
+                  type="button"
+                  onClick={resetPurchase}
+                  className="w-full py-2 px-4 text-[10px] text-gray-600 hover:text-rose-400 font-mono transition text-center"
+                >
+                  Reset License Lock (For Testing)
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ArbitrageDashboard() {
   const { connection } = useConnection();
   const { publicKey, connected, sendTransaction } = useWallet();
@@ -81,7 +303,7 @@ function ArbitrageDashboard() {
     raydium: true,
     orca: true,
   });
-  const [activeTab, setActiveTab] = useState<'scan' | 'simulations'>('scan');
+  const [activeTab, setActiveTab] = useState<'scan' | 'simulations' | 'template'>('scan');
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const isPremium = false;
 
@@ -878,6 +1100,18 @@ function ArbitrageDashboard() {
                 <TrendingUp className="h-4 w-4" />
                 Blueberry Simulator
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('template')}
+                className={`flex-1 py-2.5 px-4 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition ${
+                  activeTab === 'template'
+                    ? 'bg-emerald-600 text-white shadow'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/30'
+                }`}
+              >
+                <Code className="h-4 w-4" />
+                Get Source Code
+              </button>
             </div>
           </div>
 
@@ -1323,6 +1557,10 @@ function ArbitrageDashboard() {
               </div>
 
             </div>
+          )}
+
+          {activeTab === 'template' && (
+            <SourceCodeTemplatePaywall />
           )}
 
         </section>
