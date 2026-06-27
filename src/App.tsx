@@ -51,7 +51,7 @@ const MINT_MAPPINGS: Record<string, string> = {
 
 // Wrap app with Solana contexts
 export default function App() {
-  const endpoint = useMemo(() => 'https://api.mainnet-beta.solana.com', []);
+  const endpoint = useMemo(() => 'https://rpc.ankr.com/solana', []);
   const wallets = useMemo(() => [new PhantomWalletAdapter()], []);
 
   return (
@@ -120,7 +120,17 @@ function SourceCodeTemplatePaywall() {
         })
       );
       
-      const { blockhash } = await connection.getLatestBlockhash();
+      let blockhash;
+      try {
+        const latest = await connection.getLatestBlockhash();
+        blockhash = latest.blockhash;
+      } catch (rpcErr) {
+        console.error("RPC Error (getLatestBlockhash):", rpcErr);
+        setBuyStatus("❌ RPC Connection Error: The Solana network node is currently unreachable (403 Forbidden or Timeout). Please try again in a few moments or check your internet connection.");
+        setIsBuying(false);
+        return;
+      }
+      
       transaction.recentBlockhash = blockhash;
       transaction.feePayer = publicKey;
       
@@ -129,11 +139,17 @@ function SourceCodeTemplatePaywall() {
       
       setBuyStatus("⚡ Transaction signed! Confirming block settlement on Solana mainnet...");
       
-      const latestBlockhash = await connection.getLatestBlockhash();
+      let latestBlockhash;
+      try {
+        latestBlockhash = await connection.getLatestBlockhash();
+      } catch (rpcErr) {
+        console.warn("RPC Warning (confirmTransaction fetch):", rpcErr);
+      }
+      
       await connection.confirmTransaction({
         signature,
-        blockhash: latestBlockhash.blockhash,
-        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+        blockhash: latestBlockhash ? latestBlockhash.blockhash : blockhash,
+        lastValidBlockHeight: latestBlockhash ? latestBlockhash.lastValidBlockHeight : (blockhash ? 100000000 : 0), // fallback if confirmation fetch fails
       }, 'confirmed');
       
       setTxSignature(signature);
@@ -614,7 +630,7 @@ function ArbitrageDashboard() {
     if (!connected || !publicKey) {
       // Run high-fidelity simulation with zero wallet connection required!
       setSimLog([
-        `⚙️ [1/6] CONNECTING TO SIMULATED SANDBOX WRITE RPC FEED: https://api.mainnet-beta.solana.com`,
+        `⚙️ [1/6] CONNECTING TO SIMULATED SANDBOX WRITE RPC FEED: https://rpc.ankr.com/solana`,
         `📦 [2/6] Sandbox Mode Active: Generating simulated secure signature flow (Zero Wallet Connection)...`
       ]);
       addLog('info', 'Sandbox Mode active (Zero Wallet Connection). Processing simulated signature...');
@@ -627,7 +643,7 @@ function ArbitrageDashboard() {
     } else {
       // Real wallet connected: prompt signature instantly and synchronously
       setSimLog([
-        `⚙️ [1/6] CONNECTING TO LIVE SOLANA MAINNET WRITE RPC FEED: https://api.mainnet-beta.solana.com`,
+        `⚙️ [1/6] CONNECTING TO LIVE SOLANA MAINNET WRITE RPC FEED: https://rpc.ankr.com/solana`,
         `📦 [2/6] Constructing transaction payload and requesting Phantom Wallet signature...`
       ]);
       addLog('info', 'Sign request dispatched. Please approve the transaction in your wallet...');
@@ -643,7 +659,17 @@ function ArbitrageDashboard() {
         );
 
         // Fetch latest blockhash from Solana connection
-        const { blockhash } = await connection.getLatestBlockhash();
+        let blockhash;
+        try {
+          const latest = await connection.getLatestBlockhash();
+          blockhash = latest.blockhash;
+        } catch (err) {
+          console.warn("RPC Simulation Error:", err);
+          setSimLog((prev) => [...prev, `❌ RPC ERROR: Could not fetch blockhash from network. Simulation aborted.`]);
+          addLog('warn', 'Simulation aborted: RPC blockhash fetch failed.');
+          setSimIsRunning(false);
+          return;
+        }
         transaction.recentBlockhash = blockhash;
         transaction.feePayer = publicKey!;
 
