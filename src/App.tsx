@@ -100,23 +100,7 @@ function SourceCodeTemplatePaywall() {
     return Number((targetUSD / solPrice).toFixed(4));
   }, [solPrice]);
 
-  const handlePurchase = async (isSimulated: boolean = false) => {
-    if (isSimulated) {
-      setIsBuying(true);
-      setBuyStatus(`⚙️ Sandbox Checkout Active: Constructing mock ${solAmountRequired} SOL transaction (${targetUSD.toFixed(2)} USD)...`);
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setBuyStatus("📦 Dispatched simulated Phantom signature request. Approving automatically...");
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setBuyStatus("⚡ Sandbox signature acquired! Confirming mock block settlement on cluster...");
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      setIsPurchased(true);
-      localStorage.setItem('smoothy_code_template_purchased', 'true');
-      setBuyStatus("🟢 Success! Sandbox checkout confirmed. Source code package unlocked!");
-      setIsBuying(false);
-      return;
-    }
-
+  const handlePurchase = async () => {
     if (!connected || !publicKey) {
       setBuyStatus("❌ Error: Please connect your Phantom wallet using the button in the top-right corner before attempting mainnet purchase.");
       return;
@@ -235,7 +219,7 @@ function SourceCodeTemplatePaywall() {
               <div className="text-center py-6">
                 <Lock className="h-10 w-10 text-emerald-400 mx-auto mb-2.5 animate-pulse" />
                 <h4 className="text-sm font-bold text-white uppercase tracking-wider">Source Code Locked</h4>
-                <p className="text-[11px] text-gray-400 max-w-[280px] mx-auto mt-1">Unlock peer-to-peer using SOL or simulate the checkout flow in test-drive mode.</p>
+                <p className="text-[11px] text-gray-400 max-w-[280px] mx-auto mt-1">Unlock peer-to-peer using SOL.</p>
                 
                 <div className="mt-4 flex flex-col items-center justify-center">
                   <div className="inline-flex items-baseline gap-1.5">
@@ -252,7 +236,7 @@ function SourceCodeTemplatePaywall() {
                 <button
                   type="button"
                   disabled={isBuying}
-                  onClick={() => handlePurchase(false)}
+                  onClick={() => handlePurchase()}
                   className={`w-full py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 font-bold text-xs tracking-wider transition font-mono ${
                     isBuying
                       ? 'bg-emerald-900/40 text-emerald-500 border border-emerald-500/20 cursor-not-allowed'
@@ -261,15 +245,6 @@ function SourceCodeTemplatePaywall() {
                 >
                   <Zap className="h-4 w-4 text-amber-300 fill-amber-300" />
                   UNLOCK WITH PHANTOM ({isLoadingPrice ? '...' : `${solAmountRequired} SOL`})
-                </button>
-
-                <button
-                  type="button"
-                  disabled={isBuying}
-                  onClick={() => handlePurchase(true)}
-                  className="w-full py-2.5 px-4 rounded-lg bg-transparent hover:bg-gray-800/40 text-gray-400 hover:text-gray-200 border border-gray-800 text-[11px] font-bold tracking-wider transition font-mono"
-                >
-                  Simulate Purchase (Test-Drive)
                 </button>
 
                 {buyStatus && (
