@@ -1,19 +1,16 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { ConnectionProvider, WalletProvider, useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
-import { LAMPORTS_PER_SOL, Transaction, SystemProgram, PublicKey } from '@solana/web3.js';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Activity, Compass, Cpu, Play, Square, CheckCircle2, Code, Download, Lock,
+  Activity, Compass, Cpu, Play, Square, CheckCircle2, Code, Lock,
   Coins, TrendingUp, Zap, ShieldCheck, 
   Flame, Info, ArrowUpRight, ArrowDownRight, Award, ChevronRight,
   Volume2, VolumeX, Newspaper, ExternalLink
 } from 'lucide-react';
 import { ArbitrageEngine } from './core/arbitrageEngine';
 
-import '@solana/wallet-adapter-react-ui/styles.css';
 import './App.css';
 import smoothieLogo from './assets/smoothie.png';
+
+const LAMPORTS_PER_SOL = 1_000_000_000;
 
 // Definitions
 interface Opportunity {
@@ -59,128 +56,12 @@ const MINT_MAPPINGS: Record<string, string> = {
   JUP: 'JUPyiwrYJF1mH69A9s1gU8beR89Mgh8Bq9m1YAb1Zf5',
 };
 
-// Wrap app with Solana contexts
+// Arbitrage Terminal Dashboard
 export default function App() {
-  const endpoint = useMemo(() => 'https://rpc.ankr.com/solana', []);
-  const wallets = useMemo(() => [new PhantomWalletAdapter()], []);
-
-  return (
-    <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>
-          <ArbitrageDashboard />
-        </WalletModalProvider>
-      </WalletProvider>
-    </ConnectionProvider>
-  );
+  return <ArbitrageDashboard />;
 }
 
 function SourceCodeTemplatePaywall() {
-  const { connection } = useConnection();
-  const { publicKey, connected, sendTransaction } = useWallet();
-  const [isPurchased, setIsPurchased] = useState<boolean>(() => localStorage.getItem('smoothy_code_template_purchased') === 'true');
-  const [isBuying, setIsBuying] = useState<boolean>(false);
-  const [buyStatus, setBuyStatus] = useState<string>('');
-  const [txSignature, setTxSignature] = useState<string>('');
-  
-  const [solPrice, setSolPrice] = useState<number>(145.00); // Default fallback SOL-USD price
-  const [isLoadingPrice, setIsLoadingPrice] = useState<boolean>(true);
-
-  useEffect(() => {
-    const fetchSolPrice = async () => {
-      try {
-        setIsLoadingPrice(true);
-        const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
-        const data = await res.json();
-        if (data && data.solana && data.solana.usd) {
-          setSolPrice(data.solana.usd);
-          console.log(`Live SOL-USD Price Loaded: ${data.solana.usd}`);
-        }
-      } catch (e) {
-        console.warn('Could not fetch live SOL price, using fallback rate of $145.00:', e);
-      } finally {
-        setIsLoadingPrice(false);
-      }
-    };
-    fetchSolPrice();
-  }, []);
-
-  const targetUSD = 39.00;
-  const solAmountRequired = useMemo(() => {
-    return Number((targetUSD / solPrice).toFixed(4));
-  }, [solPrice]);
-
-  const handlePurchase = async () => {
-    if (!connected || !publicKey) {
-      setBuyStatus("❌ Error: Please connect your Phantom wallet using the button in the top-right corner before attempting mainnet purchase.");
-      return;
-    }
-    
-    setIsBuying(true);
-    setBuyStatus(`⚙️ Constructing ${solAmountRequired} SOL (${targetUSD.toFixed(2)} USD) transfer transaction payload...`);
-    
-    try {
-      const destination = new PublicKey("HqSmW6naRKm4irXNjjA73dgvwm1nAKDyUE99U52jRtxh");
-      
-      const transaction = new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: publicKey,
-          toPubkey: destination,
-          lamports: Math.round(solAmountRequired * 1_000_000_000), // convert to lamports safely
-        })
-      );
-      
-      let blockhash;
-      try {
-        const latest = await connection.getLatestBlockhash();
-        blockhash = latest.blockhash;
-      } catch (rpcErr) {
-        console.error("RPC Error (getLatestBlockhash):", rpcErr);
-        setBuyStatus("❌ RPC Connection Error: The Solana network node is currently unreachable (403 Forbidden or Timeout). Please try again in a few moments or check your internet connection.");
-        setIsBuying(false);
-        return;
-      }
-      
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = publicKey;
-      
-      setBuyStatus(`📦 Dispatched signature request to your Phantom wallet. Please approve the ${solAmountRequired} SOL transfer...`);
-      const signature = await sendTransaction(transaction, connection);
-      
-      setBuyStatus("⚡ Transaction signed! Confirming block settlement on Solana mainnet...");
-      
-      let latestBlockhash;
-      try {
-        latestBlockhash = await connection.getLatestBlockhash();
-      } catch (rpcErr) {
-        console.warn("RPC Warning (confirmTransaction fetch):", rpcErr);
-      }
-      
-      await connection.confirmTransaction({
-        signature,
-        blockhash: latestBlockhash ? latestBlockhash.blockhash : blockhash,
-        lastValidBlockHeight: latestBlockhash ? latestBlockhash.lastValidBlockHeight : (blockhash ? 100000000 : 0), // fallback if confirmation fetch fails
-      }, 'confirmed');
-      
-      setTxSignature(signature);
-      setIsPurchased(true);
-      localStorage.setItem('smoothy_code_template_purchased', 'true');
-      setBuyStatus(`🟢 Success! ${solAmountRequired} SOL payment confirmed on-chain. Source code package unlocked!`);
-    } catch (err: any) {
-      console.error("Purchase error:", err);
-      setBuyStatus(`❌ Purchase aborted: ${err.message || 'Signature rejected or network issue.'}`);
-    } finally {
-      setIsBuying(false);
-    }
-  };
-
-  const resetPurchase = () => {
-    localStorage.removeItem('smoothy_code_template_purchased');
-    setIsPurchased(false);
-    setBuyStatus('');
-    setTxSignature('');
-  };
-
   return (
     <div className="bg-[#0e1628] border border-gray-800 rounded-xl p-6 shadow-sm flex flex-col flex-1 min-h-[500px]">
       <div className="flex items-center justify-between mb-4 border-b border-gray-800 pb-3">
@@ -232,93 +113,53 @@ function SourceCodeTemplatePaywall() {
           <div className="mt-auto p-3 bg-emerald-950/10 border border-emerald-500/20 rounded-lg text-[10px] text-emerald-400 leading-relaxed font-mono flex items-start gap-2">
             <ShieldCheck className="h-4 w-4 flex-shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold text-white uppercase block mb-0.5">100% Secure & Compliant</span>
-              This transaction is executed peer-to-peer directly on the Solana Blockchain. Your wallet details remain private and safe.
+              <span className="font-bold text-white uppercase block mb-0.5">100% Secure Checkout</span>
+              This purchase is processed securely via Shoppy.gg. You will receive the download link immediately after payment.
             </div>
           </div>
         </div>
 
         {/* Right Card: Checkout / Unlock Area */}
         <div className="bg-[#0a101d] border border-gray-800 rounded-xl p-5 flex flex-col justify-between min-h-[300px]">
-          {!isPurchased ? (
-            <div className="flex flex-col gap-5 h-full justify-between">
-              <div className="text-center py-6">
-                <Lock className="h-10 w-10 text-emerald-400 mx-auto mb-2.5 animate-pulse" />
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Source Code Locked</h4>
-                <p className="text-[11px] text-gray-400 max-w-[280px] mx-auto mt-1">Unlock peer-to-peer using SOL.</p>
-                
-                <div className="mt-4 flex flex-col items-center justify-center">
-                  <div className="inline-flex items-baseline gap-1.5">
-                    <span className="text-2xl font-black text-white font-mono">{isLoadingPrice ? '...' : solAmountRequired}</span>
-                    <span className="text-xs font-bold text-emerald-400 font-mono">SOL</span>
-                  </div>
-                  <span className="text-[10px] text-gray-500 font-mono mt-1">
-                    (Pegged dynamically to exactly ${targetUSD.toFixed(2)} USD • Live: 1 SOL = ${solPrice.toFixed(2)} USD)
-                  </span>
+          <div className="flex flex-col gap-5 h-full justify-between">
+            <div className="text-center py-6">
+              <Lock className="h-10 w-10 text-emerald-400 mx-auto mb-2.5 animate-pulse" />
+              <h4 className="text-sm font-bold text-white uppercase tracking-wider">Source Code Template</h4>
+              <p className="text-[11px] text-gray-400 max-w-[280px] mx-auto mt-1">Unlock the complete codebase for your own project.</p>
+              
+              <div className="mt-4 flex flex-col items-center justify-center">
+                <div className="inline-flex items-baseline gap-1.5">
+                  <span className="text-2xl font-black text-white font-mono">$39.00</span>
+                  <span className="text-xs font-bold text-emerald-400 font-mono">USD</span>
                 </div>
-              </div>
-
-              <div className="flex flex-col gap-3 mt-auto">
-                <button
-                  type="button"
-                  disabled={isBuying}
-                  onClick={() => handlePurchase()}
-                  className={`w-full py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 font-bold text-xs tracking-wider transition font-mono ${
-                    isBuying
-                      ? 'bg-emerald-900/40 text-emerald-500 border border-emerald-500/20 cursor-not-allowed'
-                      : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow shadow-emerald-600/10'
-                  }`}
-                >
-                  <Zap className="h-4 w-4 text-amber-300 fill-amber-300" />
-                  UNLOCK WITH PHANTOM ({isLoadingPrice ? '...' : `${solAmountRequired} SOL`})
-                </button>
-
-                {buyStatus && (
-                  <div className="p-3 bg-[#070b14] border border-gray-800 rounded-lg text-[10px] text-gray-300 font-mono leading-relaxed mt-2">
-                    {buyStatus}
-                  </div>
-                )}
+                <span className="text-[10px] text-gray-500 font-mono mt-1">
+                  (One-time payment • Instant Delivery)
+                </span>
               </div>
             </div>
-          ) : (
-            <div className="flex flex-col gap-5 h-full justify-between">
-              <div className="text-center py-6">
-                <CheckCircle2 className="h-10 w-10 text-emerald-400 mx-auto mb-2.5" />
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Template Unlocked!</h4>
-                <p className="text-[11px] text-gray-400 max-w-[280px] mx-auto mt-1">Thank you for your purchase. You can now download the fully packaged template.</p>
-                
-                {txSignature && (
-                  <div className="mt-3 text-[9px] text-gray-500 font-mono truncate max-w-[250px] mx-auto">
-                    Tx: {txSignature}
-                  </div>
-                )}
-              </div>
 
-              <div className="flex flex-col gap-3 mt-auto">
-                <a
-                  href="/smoothy-source-code.zip"
-                  download="smoothy-source-code.zip"
-                  className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-2 font-bold text-xs tracking-wider transition font-mono text-center shadow shadow-emerald-600/10"
-                >
-                  <Download className="h-4 w-4" />
-                  DOWNLOAD SOURCE CODE (.ZIP)
-                </a>
+            <div className="flex flex-col gap-3 mt-auto">
+              <a
+                href="https://shoppy.gg/product/ALB7psa"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-2 font-bold text-xs tracking-wider transition font-mono shadow shadow-emerald-600/10"
+              >
+                <Zap className="h-4 w-4 text-amber-300 fill-amber-300" />
+                BUY NOW FOR $39
+              </a>
 
-                <button
-                  type="button"
-                  onClick={resetPurchase}
-                  className="w-full py-2 px-4 text-[10px] text-gray-600 hover:text-rose-400 font-mono transition text-center"
-                >
-                  Reset License Lock (For Testing)
-                </button>
+              <div className="p-3 bg-[#070b14] border border-gray-800 rounded-lg text-[10px] text-gray-400 font-mono text-center leading-relaxed mt-2">
+                Secure payment via Shoppy.gg
               </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
 
 function CryptoNews() {
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -509,14 +350,13 @@ function WaitlistSignup() {
 }
 
 function ArbitrageDashboard() {
-  const { connection } = useConnection();
-  const { publicKey, connected, sendTransaction } = useWallet();
+  // Mocked wallet state for non-wallet version
+  const connected = false;
 
   // Core Arbitrage Engine Instance
   const engine = useRef(new ArbitrageEngine());
 
   // State Management
-  const [balance, setBalance] = useState<number | null>(null);
   const [investmentAmount, setInvestmentAmount] = useState<string>('1.0');
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [selectedDEXs, setSelectedDEXs] = useState<Record<string, boolean>>({
@@ -612,32 +452,7 @@ function ArbitrageDashboard() {
   });
 
   const logsEndRef = useRef<HTMLDivElement>(null);
-  const scanIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Fetch actual SOL Balance if connected
-  useEffect(() => {
-    if (connected && publicKey) {
-      addLog('info', `Wallet connected: ${publicKey.toBase58().slice(0, 6)}...${publicKey.toBase58().slice(-4)}`);
-      
-      const fetchBalance = () => {
-        connection.getBalance(publicKey)
-          .then((bal) => {
-            setBalance(bal / LAMPORTS_PER_SOL);
-          })
-          .catch((err) => {
-            console.error("Failed to get wallet balance:", err);
-            // Fallback mock balance for simulation convenience
-            setBalance(1.45);
-          });
-      };
-
-      fetchBalance();
-      const interval = setInterval(fetchBalance, 10000);
-      return () => clearInterval(interval);
-    } else {
-      setBalance(null);
-    }
-  }, [connected, publicKey, connection]);
+  const scanIntervalRef = useRef<any>(null);
 
   // Terminal Logging Helper
   const addLog = (type: LogEntry['type'], message: string) => {
@@ -824,69 +639,18 @@ function ArbitrageDashboard() {
 
     let signature = '';
     
-    // Verify wallet connection immediately to determine if we run live-prompt or simulated-fallback
-    if (!connected || !publicKey) {
-      // Run high-fidelity simulation with zero wallet connection required!
-      setSimLog([
-        `⚙️ [1/6] CONNECTING TO SIMULATED SANDBOX WRITE RPC FEED: https://rpc.ankr.com/solana`,
-        `📦 [2/6] Sandbox Mode Active: Generating simulated secure signature flow (Zero Wallet Connection)...`
-      ]);
-      addLog('info', 'Sandbox Mode active (Zero Wallet Connection). Processing simulated signature...');
-      await new Promise(resolve => setTimeout(resolve, 800));
-      signature = 'sim_sig_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-      setSimLog((prev) => [
-        ...prev,
-        `🟢 Sandbox signature acquired! Signature: ${signature.slice(0, 14)}...`
-      ]);
-    } else {
-      // Real wallet connected: prompt signature instantly and synchronously
-      setSimLog([
-        `⚙️ [1/6] CONNECTING TO LIVE SOLANA MAINNET WRITE RPC FEED: https://rpc.ankr.com/solana`,
-        `📦 [2/6] Constructing transaction payload and requesting Phantom Wallet signature...`
-      ]);
-      addLog('info', 'Sign request dispatched. Please approve the transaction in your wallet...');
-      
-      try {
-        // Construct a safe self-transfer of 0.00001 SOL (10,000 lamports) to request their signature immediately on click
-        const transaction = new Transaction().add(
-          SystemProgram.transfer({
-            fromPubkey: publicKey!,
-            toPubkey: publicKey!, // safe self-transfer back to oneself
-            lamports: 10000, 
-          })
-        );
-
-        // Fetch latest blockhash from Solana connection
-        let blockhash;
-        try {
-          const latest = await connection.getLatestBlockhash();
-          blockhash = latest.blockhash;
-        } catch (err) {
-          console.warn("RPC Simulation Error:", err);
-          setSimLog((prev) => [...prev, `❌ RPC ERROR: Could not fetch blockhash from network. Simulation aborted.`]);
-          addLog('warn', 'Simulation aborted: RPC blockhash fetch failed.');
-          setSimIsRunning(false);
-          return;
-        }
-        transaction.recentBlockhash = blockhash;
-        transaction.feePayer = publicKey!;
-
-        // This triggers the real browser wallet extension (Phantom) to pop up instantly and synchronously on user click!
-        signature = await sendTransaction(transaction, connection);
-        addLog('success', `Transaction approved! Signature: ${signature.slice(0, 10)}...`);
-      } catch (err: any) {
-        console.warn("Real wallet signature bypassed, falling back to simulated high-fidelity dry-run execution.", err);
-        addLog('info', 'Real wallet signature bypassed/cancelled. Initiating Secure Sandbox Mode (0.00 SOL Gas)...');
-        signature = 'sim_sig_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-        
-        setSimLog((prev) => [
-          ...prev,
-          `⚠️ REAL WALLET SIGNATURE CANCELLED / BYPASSED`,
-          `🔄 AUTOMATIC FALLBACK: Secure Sandbox Dry-Run Mode active (Zero Gas, 100% Capital Safety).`,
-          `🟢 Sandbox signature acquired! Signature: ${signature.slice(0, 14)}...`
-        ]);
-      }
-    }
+    // Run high-fidelity simulation with zero wallet connection required!
+    setSimLog([
+      `⚙️ [1/6] CONNECTING TO SIMULATED SANDBOX WRITE RPC FEED: https://rpc.ankr.com/solana`,
+      `📦 [2/6] Sandbox Mode Active: Generating simulated secure signature flow (Zero Wallet Connection)...`
+    ]);
+    addLog('info', 'Sandbox Mode active (Zero Wallet Connection). Processing simulated signature...');
+    await new Promise(resolve => setTimeout(resolve, 800));
+    signature = 'sim_sig_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    setSimLog((prev) => [
+      ...prev,
+      `🟢 Sandbox signature acquired! Signature: ${signature.slice(0, 14)}...`
+    ]);
 
     // Call the custom route simulation on the engine
     const res = engine.current.simulateCustomRoute(amt, token, buyDEX, sellDEX, priorityFee);
@@ -914,7 +678,7 @@ function ArbitrageDashboard() {
         ? `📊 [4/6] LIVE JUPITER QUOTE ACQUIRED: OutAmount = ${(parseInt(liveQuoteData.outAmount) / (token === 'USDC' ? 1e6 : token === 'BONK' ? 1e5 : 1e9)).toFixed(4)} ${token}, Price Impact = ${liveQuoteData.priceImpactPct || '0.01'}%`
         : `📊 [4/6] LIVE JUPITER QUOTE MOCKED (CORS): OutAmount = ${(amt * (res.buySpotPrice || 140)).toFixed(4)} ${token}, Price Impact = 0.02%`,
       `⚡ [5/6] Real-time slippage & frontrun risk evaluation completed.`,
-      `🟢 Phantom Wallet approved transaction! Signature: ${signature.slice(0, 12)}...`,
+      `🟢 Simulation approved execution! Signature: ${signature.slice(0, 12)}...`,
       `🚀 [6/6] Submitting transaction instructions packet directly to Solana cluster: ${SWAP_URL}`
     ];
 
@@ -1103,15 +867,7 @@ function ArbitrageDashboard() {
               )}
             </button>
 
-            {connected && (
-              <div className="text-right hidden sm:block">
-                <p className="text-xs text-gray-400 m-0">Phantom Wallet Connected</p>
-                <p className="text-sm font-bold text-emerald-400 font-mono m-0">
-                  {balance !== null ? balance.toFixed(4) : 'fetching...'} SOL
-                </p>
-              </div>
-            )}
-            <WalletMultiButton className="bg-emerald-600 hover:bg-emerald-700 transition font-sans text-xs px-4 h-10 rounded-lg font-semibold" />
+            {/* Wallet & Balance removed for simplified version */}
           </div>
 
         </div>
