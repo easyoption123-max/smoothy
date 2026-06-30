@@ -329,7 +329,8 @@ function CryptoNews() {
     const fetchNews = async () => {
       try {
         setLoading(true);
-        const response = await fetch('https://api.allorigins.win/raw?url=https://min-api.cryptocompare.com/data/v2/news/?lang=EN&categories=DeFi,Solana');
+        const encodedUrl = encodeURIComponent('https://min-api.cryptocompare.com/data/v2/news/?lang=EN&categories=DeFi,Solana');
+        const response = await fetch(`https://corsproxy.io/?${encodedUrl}`);
         const data = await response.json();
         if (data && data.Data) {
           setNews(data.Data.slice(0, 12)); // Show top 12 news items
