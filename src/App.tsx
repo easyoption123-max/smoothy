@@ -310,6 +310,60 @@ function SourceCodeTemplatePaywall() {
   );
 }
 
+function WaitlistSignup() {
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success'>('idle');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    setStatus('submitting');
+    console.log(`Waitlist signup: ${email}`);
+    setTimeout(() => {
+      setStatus('success');
+      setEmail('');
+    }, 1000);
+  };
+
+  return (
+    <div className="bg-[#0e1628] border border-gray-800 rounded-xl p-6 shadow-sm mb-5">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="flex-1">
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <Flame className="h-5 w-5 text-amber-500" />
+            Join the Smoothy Waitlist
+          </h3>
+          <p className="text-sm text-gray-400 mt-1">
+            Be the first to know when we launch our professional arbitrage dashboard and premium features.
+          </p>
+        </div>
+        <form onSubmit={handleSubmit} className="flex w-full md:w-auto gap-3">
+          <input
+            type="email"
+            placeholder="Enter your email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="bg-[#070b14] border border-gray-800 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 flex-1 md:w-64"
+          />
+          <button
+            type="submit"
+            disabled={status !== 'idle'}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-6 rounded-lg text-sm transition shadow shadow-emerald-600/10 whitespace-nowrap disabled:opacity-50"
+          >
+            {status === 'success' ? 'Joined!' : status === 'submitting' ? 'Joining...' : 'Get Early Access'}
+          </button>
+        </form>
+      </div>
+      {status === 'success' && (
+        <p className="text-emerald-400 text-xs mt-3 font-mono">
+          🟢 Success! Your email has been added to our waitlist. We'll be in touch soon.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ArbitrageDashboard() {
   const { connection } = useConnection();
   const { publicKey, connected, sendTransaction } = useWallet();
@@ -1597,6 +1651,8 @@ function ArbitrageDashboard() {
           )}
 
         </section>
+
+        <WaitlistSignup />
 
         <div style={{ width: '100%', margin: 'auto', position: 'relative', zIndex: 99998, padding: '20px 0' }}>
           <iframe data-aa="2446230" src="//acceptable.a-ads.com/2446230/?size=Adaptive"
