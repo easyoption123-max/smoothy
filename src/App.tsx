@@ -7,7 +7,7 @@ import {
   Activity, Compass, Cpu, Play, Square, CheckCircle2, Code, Download, Lock,
   Coins, TrendingUp, Zap, ShieldCheck, 
   Flame, Info, ArrowUpRight, ArrowDownRight, Award, ChevronRight,
-  Volume2, VolumeX
+  Volume2, VolumeX, Newspaper, ExternalLink
 } from 'lucide-react';
 import { ArbitrageEngine } from './core/arbitrageEngine';
 
@@ -28,6 +28,16 @@ interface Opportunity {
   profitShareFee: number; // in SOL
   slippage?: number; // expected average slippage %
   status: 'active' | 'expired' | 'executing' | 'executed' | 'simulated';
+}
+
+interface NewsItem {
+  id: string;
+  imageurl: string;
+  title: string;
+  body: string;
+  source: string;
+  published_on: number;
+  url: string;
 }
 
 interface LogEntry {
@@ -310,6 +320,113 @@ function SourceCodeTemplatePaywall() {
   );
 }
 
+function CryptoNews() {
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchNews = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('https://min-api.cryptocompare.com/data/v2/news/?lang=EN&categories=DeFi,Solana');
+        const data = await response.json();
+        if (data && data.Data) {
+          setNews(data.Data.slice(0, 12)); // Show top 12 news items
+        } else {
+          throw new Error('Invalid response from news API');
+        }
+      } catch (err) {
+        console.error('Error fetching crypto news:', err);
+        setError('Failed to load live crypto news. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNews();
+  }, []);
+
+  const getTimeAgo = (timestamp: number) => {
+    const seconds = Math.floor(Date.now() / 1000 - timestamp);
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
+
+  return (
+    <div className="bg-[#0e1628] border border-gray-800 rounded-xl p-5 shadow-sm flex flex-col flex-1 min-h-[500px]">
+      <div className="flex items-center justify-between mb-6 border-b border-gray-800 pb-3">
+        <h2 className="text-base font-semibold text-white flex items-center gap-2 m-0">
+          <Newspaper className="h-4 w-4 text-emerald-400" />
+          Live Crypto & DeFi News
+        </h2>
+        <span className="text-[10px] font-mono bg-gray-800 text-gray-400 px-2 py-0.5 rounded">
+          POWERED BY CRYPTOCOMPARE
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-[#0a101d] border border-gray-800 rounded-xl p-4 animate-pulse flex flex-col gap-3">
+              <div className="w-full h-32 bg-gray-800 rounded-lg"></div>
+              <div className="h-4 bg-gray-800 rounded w-3/4"></div>
+              <div className="h-3 bg-gray-800 rounded w-full"></div>
+              <div className="h-3 bg-gray-800 rounded w-5/6"></div>
+            </div>
+          ))}
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center border border-dashed border-gray-800 rounded-xl bg-[#070b14]/30">
+          <Info className="h-10 w-10 text-rose-500 mb-3" />
+          <p className="text-sm text-gray-300 font-semibold mb-1">{error}</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 overflow-y-auto custom-scrollbar max-h-[600px] pr-1">
+          {news.map((item) => (
+            <a
+              key={item.id}
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-[#0a101d] border border-gray-800 rounded-xl p-0 overflow-hidden hover:border-emerald-500/50 transition group flex flex-col"
+            >
+              <div className="h-32 overflow-hidden relative">
+                <img src={item.imageurl} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0a101d] to-transparent opacity-60"></div>
+                <div className="absolute bottom-2 left-3 flex items-center gap-2">
+                  <span className="text-[9px] font-bold bg-emerald-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wider">
+                    {item.source}
+                  </span>
+                  <span className="text-[9px] font-mono text-gray-300">
+                    {getTimeAgo(item.published_on)}
+                  </span>
+                </div>
+              </div>
+              <div className="p-4 flex flex-col flex-1">
+                <h3 className="text-sm font-bold text-white mb-2 line-clamp-2 group-hover:text-emerald-400 transition">
+                  {item.title}
+                </h3>
+                <p className="text-xs text-gray-400 line-clamp-3 mb-4 leading-relaxed">
+                  {item.body}
+                </p>
+                <div className="mt-auto flex items-center justify-end text-emerald-500 text-[10px] font-bold uppercase tracking-widest gap-1 group-hover:gap-2 transition-all">
+                  Read Article <ExternalLink className="h-3 w-3" />
+                </div>
+              </div>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function WaitlistSignup() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success'>('idle');
@@ -380,7 +497,7 @@ function ArbitrageDashboard() {
     raydium: true,
     orca: true,
   });
-  const [activeTab, setActiveTab] = useState<'scan' | 'simulations' | 'template'>('scan');
+  const [activeTab, setActiveTab] = useState<'scan' | 'simulations' | 'template' | 'news'>('scan');
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const isPremium = false;
 
@@ -1199,6 +1316,18 @@ function ArbitrageDashboard() {
                 <Code className="h-4 w-4" />
                 Get Source Code
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('news')}
+                className={`flex-1 py-2.5 px-4 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition ${
+                  activeTab === 'news'
+                    ? 'bg-emerald-600 text-white shadow'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/30'
+                }`}
+              >
+                <Newspaper className="h-4 w-4" />
+                Crypto News
+              </button>
             </div>
           </div>
 
@@ -1650,6 +1779,9 @@ function ArbitrageDashboard() {
             <SourceCodeTemplatePaywall />
           )}
 
+          {activeTab === 'news' && (
+            <CryptoNews />
+          )}
         </section>
 
         <WaitlistSignup />
