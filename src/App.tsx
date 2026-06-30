@@ -1598,6 +1598,13 @@ function ArbitrageDashboard() {
 
         </section>
 
+        <div style={{ width: '100%', margin: 'auto', position: 'relative', zIndex: 99998, padding: '20px 0' }}>
+          <iframe data-aa="2446230" src="//acceptable.a-ads.com/2446230/?size=Adaptive"
+            style={{ border: 0, padding: 0, width: '70%', height: 'auto', overflow: 'hidden', display: 'block', margin: 'auto' }}
+            title="Anonymous Ads"
+          />
+        </div>
+
       </main>
 
       {/* Footer System Status Bar */}
