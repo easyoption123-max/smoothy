@@ -325,15 +325,35 @@ function CryptoNews() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Extract first image URL from HTML description
+  const extractImage = (desc: string, thumb: string): string => {
+    if (thumb) return thumb;
+    const match = desc.match(/<img[^>]+src=["']([^"']+)["']/);
+    return match ? match[1] : '';
+  };
+
+  // Strip HTML tags for body text
+  const stripHtml = (html: string): string => {
+    return html.replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ').trim();
+  };
+
   useEffect(() => {
     const fetchNews = async () => {
       try {
         setLoading(true);
-        const encodedUrl = encodeURIComponent('https://min-api.cryptocompare.com/data/v2/news/?lang=EN&categories=DeFi,Solana');
-        const response = await fetch(`https://corsproxy.io/?${encodedUrl}`);
+        const response = await fetch('https://api.rss2json.com/v1/api.json?rss_url=https://cointelegraph.com/rss');
         const data = await response.json();
-        if (data && data.Data) {
-          setNews(data.Data.slice(0, 12)); // Show top 12 news items
+        if (data && data.status === 'ok' && data.items) {
+          const mapped: NewsItem[] = data.items.slice(0, 12).map((item: any, idx: number) => ({
+            id: `news-${idx}-${Date.now()}`,
+            title: item.title || '',
+            url: item.link || '',
+            imageurl: extractImage(item.description || '', item.thumbnail || ''),
+            source: item.author ? item.author.replace(/^.*?by\s+/i, '') : 'CoinTelegraph',
+            published_on: Math.floor(new Date(item.pubDate).getTime() / 1000),
+            body: stripHtml(item.description || '').substring(0, 300),
+          }));
+          setNews(mapped);
         } else {
           throw new Error('Invalid response from news API');
         }
@@ -367,7 +387,7 @@ function CryptoNews() {
           Live Crypto & DeFi News
         </h2>
         <span className="text-[10px] font-mono bg-gray-800 text-gray-400 px-2 py-0.5 rounded">
-          POWERED BY CRYPTOCOMPARE
+          COINTELEGRAPH
         </span>
       </div>
 
@@ -398,7 +418,13 @@ function CryptoNews() {
               className="bg-[#0a101d] border border-gray-800 rounded-xl p-0 overflow-hidden hover:border-emerald-500/50 transition group flex flex-col"
             >
               <div className="h-32 overflow-hidden relative">
-                <img src={item.imageurl} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                {item.imageurl ? (
+                  <img src={item.imageurl} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-emerald-900/40 to-blue-900/40 flex items-center justify-center">
+                    <Newspaper className="h-10 w-10 text-emerald-600/50" />
+                  </div>
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0a101d] to-transparent opacity-60"></div>
                 <div className="absolute bottom-2 left-3 flex items-center gap-2">
                   <span className="text-[9px] font-bold bg-emerald-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wider">
